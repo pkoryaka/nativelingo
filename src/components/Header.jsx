@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Languages, Settings, History, Sparkles, Sun, Moon, ShieldCheck, Cloud, BadgeCheck, Clock } from 'lucide-react';
+import { Languages, Settings, History, Sparkles, Sun, Moon, ShieldCheck, Cloud, BadgeCheck, Clock, Building2 } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { licenseService } from '../services/licenseService';
 import appLogo from '../assets/app-icon.png';
@@ -34,39 +34,47 @@ export function Header({ currentModel, onOpenSettings, onOpenHistory, hasApiKey,
           type="button"
           onClick={() => onOpenSettings && onOpenSettings('license')}
           title={
-            license.useType === 'personal'
-              ? 'Personal & Educational Use: 100% Free Forever (EULA Sec. 3)'
-              : license.isLicensed
-                ? 'Commercial License Active'
-                : license.isCommercialTrialActive
-                  ? `Commercial Evaluation: ${license.commercialDaysRemaining} days remaining (EULA Sec. 2)`
-                  : 'Commercial Evaluation Expired - Click to license'
+            license.isEnterprise
+              ? `Enterprise BYOM Managed: ${license.organizationName} (EULA Sec. 4)`
+              : license.useType === 'personal'
+                ? 'Personal & Educational Use: 100% Free Forever (EULA Sec. 3)'
+                : license.isLicensed
+                  ? 'Commercial License Active'
+                  : license.isCommercialTrialActive
+                    ? `Commercial Evaluation: ${license.commercialDaysRemaining} days remaining (EULA Sec. 2)`
+                    : 'Commercial Evaluation Expired - Click to license'
           }
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '5px',
-            background: license.useType === 'personal'
-              ? 'rgba(16, 185, 129, 0.12)'
-              : license.isLicensed
-                ? 'rgba(16, 185, 129, 0.15)'
-                : license.isCommercialTrialActive
-                  ? 'rgba(245, 158, 11, 0.12)'
-                  : 'rgba(239, 68, 68, 0.12)',
-            border: `1px solid ${
-              license.useType === 'personal'
-                ? 'rgba(16, 185, 129, 0.3)'
+            background: license.isEnterprise
+              ? 'rgba(99, 102, 241, 0.15)'
+              : license.useType === 'personal'
+                ? 'rgba(16, 185, 129, 0.12)'
                 : license.isLicensed
-                  ? 'rgba(16, 185, 129, 0.35)'
+                  ? 'rgba(16, 185, 129, 0.15)'
                   : license.isCommercialTrialActive
-                    ? 'rgba(245, 158, 11, 0.3)'
-                    : 'rgba(239, 68, 68, 0.3)'
+                    ? 'rgba(245, 158, 11, 0.12)'
+                    : 'rgba(239, 68, 68, 0.12)',
+            border: `1px solid ${
+              license.isEnterprise
+                ? 'rgba(99, 102, 241, 0.35)'
+                : license.useType === 'personal'
+                  ? 'rgba(16, 185, 129, 0.3)'
+                  : license.isLicensed
+                    ? 'rgba(16, 185, 129, 0.35)'
+                    : license.isCommercialTrialActive
+                      ? 'rgba(245, 158, 11, 0.3)'
+                      : 'rgba(239, 68, 68, 0.3)'
             }`,
-            color: license.useType === 'personal' || license.isLicensed
-              ? 'var(--accent-emerald)'
-              : license.isCommercialTrialActive
-                ? 'var(--accent-amber)'
-                : '#f87171',
+            color: license.isEnterprise
+              ? 'var(--primary)'
+              : license.useType === 'personal' || license.isLicensed
+                ? 'var(--accent-emerald)'
+                : license.isCommercialTrialActive
+                  ? 'var(--accent-amber)'
+                  : '#f87171',
             padding: '4px 9px',
             borderRadius: '999px',
             fontSize: '0.72rem',
@@ -74,7 +82,12 @@ export function Header({ currentModel, onOpenSettings, onOpenHistory, hasApiKey,
             cursor: 'pointer'
           }}
         >
-          {license.useType === 'personal' ? (
+          {license.isEnterprise ? (
+            <>
+              <Building2 size={12} />
+              <span>{license.organizationName}</span>
+            </>
+          ) : license.useType === 'personal' ? (
             <>
               <BadgeCheck size={12} />
               <span>Personal (Free)</span>

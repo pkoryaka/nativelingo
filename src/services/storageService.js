@@ -169,12 +169,39 @@ const DEFAULT_PRESETS = [
 ];
 
 
+let enterprisePolicyCache = null;
+
 export const storageService = {
+  /**
+   * Initializes and caches the Enterprise BYOM Policy from Electron main process.
+   */
+  initEnterprisePolicy: async () => {
+    if (window.electronAPI?.getEnterprisePolicy) {
+      try {
+        enterprisePolicyCache = await window.electronAPI.getEnterprisePolicy();
+      } catch (err) {
+        console.warn('Could not fetch enterprise policy:', err);
+      }
+    }
+    return enterprisePolicyCache;
+  },
+
+  getEnterprisePolicy: () => enterprisePolicyCache,
+
+  isEnterpriseManaged: () => Boolean(enterprisePolicyCache && enterprisePolicyCache.organizationName),
+
   getApiKey: () => {
+    if (enterprisePolicyCache?.lockSettings && enterprisePolicyCache.hasApiKey) {
+      return localStorage.getItem(STORAGE_KEYS.API_KEY) || '••••••••••••••••';
+    }
     return localStorage.getItem(STORAGE_KEYS.API_KEY) || '';
   },
 
   setApiKey: (key) => {
+    if (enterprisePolicyCache?.lockSettings && enterprisePolicyCache.hasApiKey) {
+      // Locked by corporate policy
+      return;
+    }
     localStorage.setItem(STORAGE_KEYS.API_KEY, key.trim());
     storageService.syncToElectron();
   },
@@ -182,20 +209,50 @@ export const storageService = {
   getSettings: () => {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-      if (!data) return DEFAULT_SETTINGS;
-      const parsed = JSON.parse(data);
+      const parsed = data ? JSON.parse(data) : {};
       const deprecatedModels = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
       if (!parsed.model || deprecatedModels.includes(parsed.model)) {
         parsed.model = 'gemini-flash-lite-latest';
       }
-      return { ...DEFAULT_SETTINGS, ...parsed };
+      
+      const merged = { ...DEFAULT_SETTINGS, ...parsed };
+
+      // Apply Enterprise BYOM Policy overrides if machine is enterprise-managed
+      if (enterprisePolicyCache) {
+        if (enterprisePolicyCache.aiProvider) {
+          merged.aiProvider = enterprisePolicyCache.aiProvider;
+        }
+        if (enterprisePolicyCache.customEndpoint) {
+          merged.customEndpoint = enterprisePolicyCache.customEndpoint;
+        }
+        if (enterprisePolicyCache.customModel) {
+          merged.customModel = enterprisePolicyCache.customModel;
+        }
+        if (enterprisePolicyCache.model) {
+          merged.model = enterprisePolicyCache.model;
+        }
+        if (enterprisePolicyCache.disableHistory) {
+          merged.saveHistory = false;
+        }
+      }
+
+      return merged;
     } catch {
       return DEFAULT_SETTINGS;
     }
   },
 
   saveSettings: (settings) => {
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    let cleanSettings = { ...settings };
+    if (enterprisePolicyCache && enterprisePolicyCache.lockSettings) {
+      // Preserve enterprise-enforced settings
+      if (enterprisePolicyCache.aiProvider) cleanSettings.aiProvider = enterprisePolicyCache.aiProvider;
+      if (enterprisePolicyCache.customEndpoint) cleanSettings.customEndpoint = enterprisePolicyCache.customEndpoint;
+      if (enterprisePolicyCache.customModel) cleanSettings.customModel = enterprisePolicyCache.customModel;
+      if (enterprisePolicyCache.model) cleanSettings.model = enterprisePolicyCache.model;
+      if (enterprisePolicyCache.disableHistory) cleanSettings.saveHistory = false;
+    }
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(cleanSettings));
     storageService.syncToElectron();
   },
 
@@ -316,6 +373,10 @@ export const storageService = {
   },
 
   addHistoryItem: (item) => {
+    // If corporate DLP policy disables history, do not persist to disk
+    if (enterprisePolicyCache?.disableHistory) {
+      return null;
+    }
     try {
       const history = storageService.getHistory();
       const newItem = {

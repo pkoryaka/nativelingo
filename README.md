@@ -115,6 +115,16 @@ NativeLingo follows a **Dual-Use / Fair-Code License** under the [NativeLingo EU
 
 ---
 
+## 🏢 Enterprise BYOM & IT Administration
+
+For IT administrators, cybersecurity teams, and corporate rollouts:
+* **Zero-Touch Machine Policy:** Deploy a single `C:\ProgramData\NativeLingo\policy.json` to configure and lock workstations to internal Azure OpenAI gateways, private company Ollama/vLLM servers, or enterprise Google Cloud keys.
+* **Tamper-Proofing:** Machine-wide policy locks settings against employee modification and masks API keys.
+* **Zero Telemetry & DLP Compliance:** Zero third-party telemetry or relay servers. Enable `"disableHistory": true` to prevent any text from being stored on local disks.
+* **Intune / SCCM / GPO Scripts:** See [`ENTERPRISE.md`](./ENTERPRISE.md) for full policy schema and PowerShell deployment scripts.
+
+---
+
 ## 🚀 Quick Start
 
 ### Installation

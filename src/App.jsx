@@ -95,8 +95,13 @@ export function App() {
     setActivePreset(null);
   };
 
-  // Proactively sync settings to Electron main process on mount
+  // Proactively initialize enterprise policy and sync settings on mount
   useEffect(() => {
+    async function init() {
+      await storageService.initEnterprisePolicy();
+      refreshSettings();
+    }
+    init();
     storageService.syncToElectron();
   }, []);
 
@@ -104,15 +109,17 @@ export function App() {
     const text = textToTranslate !== undefined ? textToTranslate : sourceText;
     if (!text || !text.trim()) return;
 
+    const currentSettings = storageService.getSettings();
+    const isLocalOrProxy = currentSettings.aiProvider === 'openai_compatible';
     const currentKey = storageService.getApiKey();
-    if (!currentKey) {
+
+    if (!isLocalOrProxy && !currentKey && !storageService.isEnterpriseManaged()) {
       setErrorMessage('Please configure your Gemini API Key in Settings.');
       switchToFullMode();
       setIsSettingsOpen(true);
       return;
     }
 
-    const currentSettings = storageService.getSettings();
     const mode = explicitExplainMode !== undefined ? explicitExplainMode : explainJargon;
     const effectivePrompt = explicitCustomPrompt !== undefined ? explicitCustomPrompt : customPrompt;
     // When a custom prompt is active, do NOT force default target language to Ukrainian

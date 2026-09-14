@@ -24,7 +24,14 @@ NativeLingo implements a dual-use client-side licensing model with zero token ma
   - `useType`: `'personal'` (default, 100% free perpetual) | `'commercial'` (40-day trial / licensed).
   - `isPro`: Always `true` for Personal use, and `true` during active commercial trial or when licensed.
   - Feature gates (`canUseAutoPaste()`, `canUseSlot()`, `canUseJargonExplainer()`): Unlocked for all compliant users.
+- **Enterprise BYOM & Machine Policy Engine**:
+  - `C:\ProgramData\NativeLingo\policy.json` (or `userData/enterprise_policy.json`):
+  - Detected and loaded on Electron boot in `electron/main.cjs`.
+  - Machine-wide policy locks settings (`lockSettings: true`), pre-configures internal company proxy endpoints (`customEndpoint`), masks API keys (`customApiKey`), sets enterprise Gemini keys, and auto-enrolls into corporate Team License.
+  - Supports enterprise DLP: `"disableHistory": true` disables all local translation history disk persistence.
+  - Exposed to renderer via `window.electronAPI.getEnterprisePolicy()`.
 - **UI Components**:
-  - `src/components/SettingsModal.jsx`: Usage type selector (Personal vs Commercial) and commercial activation tools.
-  - `src/components/Header.jsx`: Badge displaying `Personal (Free)`, `Evaluation (Xd)`, or `Commercial Pro`.
+  - `src/components/SettingsModal.jsx`: Usage type selector (Personal vs Commercial), IT-managed banner (`🏢 Managed by [Org Name]`), settings locking, and commercial activation tools.
+  - `src/components/Header.jsx`: Badge displaying `🏢 [Org Name]` when managed, `Personal (Free)`, `Evaluation (Xd)`, or `Commercial Pro`.
+  - `ENTERPRISE.md`: Complete IT admin guide with Microsoft Intune, SCCM, and GPO PowerShell deployment scripts.
   - `PRICING.md`: Detailed public pricing and terms of service.

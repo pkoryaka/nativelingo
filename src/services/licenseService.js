@@ -1,3 +1,5 @@
+import { storageService } from './storageService';
+
 const STORAGE_KEYS = {
   LICENSE_KEY: 'nativelingo_license_key',
   LICENSE_PLAN: 'nativelingo_license_plan', // 'commercial_pro' | 'commercial_perpetual' | 'commercial_team'
@@ -13,6 +15,26 @@ export const licenseService = {
    * Initializes or fetches the current license state.
    */
   getLicenseState: () => {
+    const enterprisePolicy = storageService.getEnterprisePolicy();
+    const isEnterpriseManaged = Boolean(enterprisePolicy && enterprisePolicy.organizationName);
+
+    if (isEnterpriseManaged) {
+      return {
+        isPro: true,
+        useType: 'commercial',
+        plan: 'commercial_team',
+        licenseKey: enterprisePolicy.licenseKey || `NL-TEAM-${(enterprisePolicy.organizationName || 'CORP').replace(/[^a-zA-Z0-9]/g, '-').toUpperCase()}`,
+        isLicensed: true,
+        isEnterprise: true,
+        isEnterpriseLocked: Boolean(enterprisePolicy.lockSettings),
+        organizationName: enterprisePolicy.organizationName,
+        isCommercialTrialActive: false,
+        isCommercialExpired: false,
+        commercialDaysRemaining: 365,
+        commercialTrialDays: COMMERCIAL_TRIAL_DAYS
+      };
+    }
+
     let licenseKey = localStorage.getItem(STORAGE_KEYS.LICENSE_KEY) || '';
     let plan = localStorage.getItem(STORAGE_KEYS.LICENSE_PLAN);
     let useType = localStorage.getItem(STORAGE_KEYS.USE_TYPE) || 'personal';
@@ -51,6 +73,9 @@ export const licenseService = {
       plan: currentPlan,
       licenseKey,
       isLicensed,
+      isEnterprise: false,
+      isEnterpriseLocked: false,
+      organizationName: null,
       isCommercialTrialActive,
       isCommercialExpired,
       commercialDaysRemaining,
@@ -62,6 +87,12 @@ export const licenseService = {
    * Switch between Personal (100% Free) and Commercial (40-day trial / Paid) deployment.
    */
   setUseType: (type) => {
+    const enterprisePolicy = storageService.getEnterprisePolicy();
+    if (enterprisePolicy && enterprisePolicy.lockSettings) {
+      // Cannot override corporate deployment type
+      return licenseService.getLicenseState();
+    }
+
     const valid = type === 'commercial' ? 'commercial' : 'personal';
     localStorage.setItem(STORAGE_KEYS.USE_TYPE, valid);
     if (valid === 'commercial' && !localStorage.getItem(STORAGE_KEYS.COMMERCIAL_TRIAL_START)) {
@@ -109,6 +140,10 @@ export const licenseService = {
    * Clears the current license key and returns to default state.
    */
   deactivateLicense: () => {
+    const enterprisePolicy = storageService.getEnterprisePolicy();
+    if (enterprisePolicy && enterprisePolicy.lockSettings) {
+      return;
+    }
     localStorage.removeItem(STORAGE_KEYS.LICENSE_KEY);
     localStorage.removeItem(STORAGE_KEYS.LICENSE_PLAN);
     localStorage.removeItem(STORAGE_KEYS.ACTIVATED_AT);

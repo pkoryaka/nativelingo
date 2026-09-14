@@ -46,6 +46,76 @@ let savedCustomEndpoint = 'http://localhost:11434/v1';
 let savedCustomApiKey = '';
 let savedCustomModel = 'llama3.2';
 
+// Enterprise BYOM & Policy Enforcement
+let enterprisePolicy = null;
+
+function getEnterprisePolicyPaths() {
+  const paths = [];
+  const programData = process.env.ALLUSERSPROFILE || process.env.ProgramData || 'C:\\ProgramData';
+  paths.push(path.join(programData, 'NativeLingo', 'policy.json'));
+  paths.push(path.join(programData, 'nativelingo', 'policy.json'));
+  try {
+    const userData = app.getPath('userData');
+    paths.push(path.join(userData, 'enterprise_policy.json'));
+    paths.push(path.join(userData, 'policy.json'));
+  } catch {}
+  return paths;
+}
+
+function applyEnterprisePolicy() {
+  if (!enterprisePolicy) return;
+  console.log(`[Enterprise BYOM] Applying enterprise policy for org: ${enterprisePolicy.organizationName || 'Corporate'}`);
+
+  if (enterprisePolicy.aiProvider) {
+    savedAiProvider = enterprisePolicy.aiProvider;
+  }
+  if (enterprisePolicy.apiKey) {
+    savedApiKey = enterprisePolicy.apiKey;
+  }
+  if (enterprisePolicy.customGeminiModel) {
+    savedCustomGeminiModel = enterprisePolicy.customGeminiModel;
+  }
+  if (enterprisePolicy.customEndpoint) {
+    savedCustomEndpoint = enterprisePolicy.customEndpoint;
+  }
+  if (enterprisePolicy.customApiKey) {
+    savedCustomApiKey = enterprisePolicy.customApiKey;
+  }
+  if (enterprisePolicy.customModel) {
+    savedCustomModel = enterprisePolicy.customModel;
+  }
+  if (enterprisePolicy.model) {
+    savedModel = enterprisePolicy.model;
+  }
+  if (enterprisePolicy.primaryTargetLanguage) {
+    savedTargetLang = enterprisePolicy.primaryTargetLanguage;
+  }
+}
+
+function loadEnterprisePolicy() {
+  try {
+    const candidatePaths = getEnterprisePolicyPaths();
+    for (const policyPath of candidatePaths) {
+      if (fs.existsSync(policyPath)) {
+        try {
+          const raw = fs.readFileSync(policyPath, 'utf8');
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            enterprisePolicy = parsed;
+            console.log(`[Enterprise BYOM] Active policy loaded from: ${policyPath}`);
+            applyEnterprisePolicy();
+            return;
+          }
+        } catch (readErr) {
+          console.warn(`[Enterprise BYOM] Failed to parse policy file at ${policyPath}:`, readErr);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Enterprise BYOM] Error checking enterprise policy paths:', err);
+  }
+}
+
 let quickPromptSlots = [
   {
     id: 1,
@@ -130,18 +200,34 @@ function loadSavedConfig() {
         } catch {}
       }
     }
+
+    // Load and enforce enterprise machine policy (overrides user config if present)
+    loadEnterprisePolicy();
   } catch (e) {
     console.warn('Could not load saved config:', e);
   }
 }
 
-function saveConfig(updates) {
+function saveConfig(updates = {}) {
   try {
     const configPath = getConfigPath();
     let existing = {};
     if (fs.existsSync(configPath)) {
       try { existing = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch {}
     }
+
+    // If enterprise policy locks settings, preserve enterprise-controlled parameters
+    const safeUpdates = { ...updates };
+    if (enterprisePolicy && enterprisePolicy.lockSettings) {
+      if (enterprisePolicy.aiProvider !== undefined) delete safeUpdates.aiProvider;
+      if (enterprisePolicy.apiKey !== undefined) delete safeUpdates.apiKey;
+      if (enterprisePolicy.customGeminiModel !== undefined) delete safeUpdates.customGeminiModel;
+      if (enterprisePolicy.customEndpoint !== undefined) delete safeUpdates.customEndpoint;
+      if (enterprisePolicy.customApiKey !== undefined) delete safeUpdates.customApiKey;
+      if (enterprisePolicy.customModel !== undefined) delete safeUpdates.customModel;
+      if (enterprisePolicy.model !== undefined) delete safeUpdates.model;
+    }
+
     fs.writeFileSync(configPath, JSON.stringify({
       ...existing,
       translateHotkey,
@@ -156,7 +242,7 @@ function saveConfig(updates) {
       customEndpoint: savedCustomEndpoint,
       customApiKey: savedCustomApiKey,
       customModel: savedCustomModel,
-      ...updates
+      ...safeUpdates
     }), 'utf8');
   } catch (e) {
     console.warn('Could not save config:', e);
@@ -1040,16 +1126,37 @@ ipcMain.handle('config:set-start-minimized', async (event, val) => {
 
 ipcMain.handle('config:sync', async (event, cfg) => {
   if (!cfg) return false;
-  if (cfg.apiKey !== undefined) savedApiKey = cfg.apiKey;
-  if (cfg.primaryTargetLanguage !== undefined) savedTargetLang = cfg.primaryTargetLanguage;
-  if (cfg.model !== undefined) savedModel = cfg.model;
-  if (cfg.aiProvider !== undefined) savedAiProvider = cfg.aiProvider;
-  if (cfg.customGeminiModel !== undefined) savedCustomGeminiModel = cfg.customGeminiModel;
-  if (cfg.customEndpoint !== undefined) savedCustomEndpoint = cfg.customEndpoint;
-  if (cfg.customApiKey !== undefined) savedCustomApiKey = cfg.customApiKey;
-  if (cfg.customModel !== undefined) savedCustomModel = cfg.customModel;
+  const isLocked = Boolean(enterprisePolicy && enterprisePolicy.lockSettings);
+
+  if (cfg.apiKey !== undefined && (!isLocked || !enterprisePolicy.apiKey)) savedApiKey = cfg.apiKey;
+  if (cfg.primaryTargetLanguage !== undefined && (!isLocked || !enterprisePolicy.primaryTargetLanguage)) savedTargetLang = cfg.primaryTargetLanguage;
+  if (cfg.model !== undefined && (!isLocked || !enterprisePolicy.model)) savedModel = cfg.model;
+  if (cfg.aiProvider !== undefined && (!isLocked || !enterprisePolicy.aiProvider)) savedAiProvider = cfg.aiProvider;
+  if (cfg.customGeminiModel !== undefined && (!isLocked || !enterprisePolicy.customGeminiModel)) savedCustomGeminiModel = cfg.customGeminiModel;
+  if (cfg.customEndpoint !== undefined && (!isLocked || !enterprisePolicy.customEndpoint)) savedCustomEndpoint = cfg.customEndpoint;
+  if (cfg.customApiKey !== undefined && (!isLocked || !enterprisePolicy.customApiKey)) savedCustomApiKey = cfg.customApiKey;
+  if (cfg.customModel !== undefined && (!isLocked || !enterprisePolicy.customModel)) savedCustomModel = cfg.customModel;
+
   saveConfig(cfg);
   return true;
+});
+
+ipcMain.handle('enterprise:get-policy', async () => {
+  if (!enterprisePolicy) return null;
+  return {
+    organizationName: enterprisePolicy.organizationName || 'Corporate Enterprise',
+    licenseKey: enterprisePolicy.licenseKey || '',
+    lockSettings: Boolean(enterprisePolicy.lockSettings),
+    aiProvider: enterprisePolicy.aiProvider || savedAiProvider,
+    customEndpoint: enterprisePolicy.customEndpoint || savedCustomEndpoint,
+    customModel: enterprisePolicy.customModel || savedCustomModel,
+    model: enterprisePolicy.model || savedModel,
+    hasApiKey: Boolean(savedApiKey && savedApiKey.trim()),
+    hasCustomApiKey: Boolean(savedCustomApiKey && savedCustomApiKey.trim()),
+    disableHistory: Boolean(enterprisePolicy.disableHistory),
+    disallowExternalCloud: Boolean(enterprisePolicy.disallowExternalCloud),
+    allowedTargetLanguages: enterprisePolicy.allowedTargetLanguages || null
+  };
 });
 
 ipcMain.handle('hotkeys:get', async () => {
@@ -1269,27 +1376,7 @@ ipcMain.handle('endpoint:test', async (event, { endpoint, model, apiKey }) => {
   }
 });
 
-ipcMain.handle('config:sync', (event, cfg = {}) => {
-  if (cfg.apiKey !== undefined) savedApiKey = cfg.apiKey;
-  if (cfg.primaryTargetLanguage !== undefined) savedTargetLang = cfg.primaryTargetLanguage;
-  if (cfg.model !== undefined) savedModel = cfg.model;
-  if (cfg.aiProvider !== undefined) savedAiProvider = cfg.aiProvider;
-  if (cfg.customGeminiModel !== undefined) savedCustomGeminiModel = cfg.customGeminiModel;
-  if (cfg.customEndpoint !== undefined) savedCustomEndpoint = cfg.customEndpoint;
-  if (cfg.customApiKey !== undefined) savedCustomApiKey = cfg.customApiKey;
-  if (cfg.customModel !== undefined) savedCustomModel = cfg.customModel;
-  saveConfig({
-    apiKey: savedApiKey,
-    primaryTargetLanguage: savedTargetLang,
-    model: savedModel,
-    aiProvider: savedAiProvider,
-    customGeminiModel: savedCustomGeminiModel,
-    customEndpoint: savedCustomEndpoint,
-    customApiKey: savedCustomApiKey,
-    customModel: savedCustomModel
-  });
-  return true;
-});
+
 
 // High-Fidelity Neural Speech Synthesis (Powered by Edge TTS)
 const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');

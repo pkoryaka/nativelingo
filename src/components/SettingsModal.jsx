@@ -3,7 +3,8 @@ import {
   X, Key, ExternalLink, CheckCircle2, AlertCircle, Loader2, Sparkles, 
   Monitor, RotateCw, Power, Keyboard, Zap, BookOpen, Languages, 
   AppWindow, Cpu, Server, Sun, Moon, Palette, Sliders, History,
-  Star, Search, Check, Volume2, VolumeX, CreditCard, BadgeCheck, ShieldAlert, Award
+  Star, Search, Check, Volume2, VolumeX, CreditCard, BadgeCheck, ShieldAlert, Award,
+  Building2, Lock
 } from 'lucide-react';
 import { AVAILABLE_MODELS, SUPPORTED_LANGUAGES, testGeminiApiKey, fetchLiveAvailableModels } from '../services/geminiService';
 import { storageService, ROLE_PRESET_PACKS } from '../services/storageService';
@@ -14,6 +15,10 @@ import appLogo from '../assets/app-icon.png';
 
 export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initialTheme, onToggleTheme, initialTab = 'models' }) {
   if (!isOpen) return null;
+
+  const enterprisePolicy = storageService.getEnterprisePolicy();
+  const isEnterprise = Boolean(enterprisePolicy && enterprisePolicy.organizationName);
+  const isLocked = Boolean(isEnterprise && enterprisePolicy.lockSettings);
 
   const currentSettings = storageService.getSettings();
   const currentKey = storageService.getApiKey();
@@ -450,8 +455,8 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
               <Award size={17} />
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: '1.2' }}>
                 <span>License & Terms</span>
-                <span style={{ fontSize: '0.65rem', color: licenseState.useType === 'personal' || licenseState.isLicensed ? '#10b981' : (licenseState.isCommercialTrialActive ? 'var(--accent-amber)' : '#f87171') }}>
-                  {licenseState.useType === 'personal' ? 'Personal (Free)' : (licenseState.isLicensed ? 'Commercial Pro' : `Eval (${licenseState.commercialDaysRemaining}d)`)}
+                <span style={{ fontSize: '0.65rem', color: isEnterprise ? 'var(--primary)' : (licenseState.useType === 'personal' || licenseState.isLicensed ? '#10b981' : (licenseState.isCommercialTrialActive ? 'var(--accent-amber)' : '#f87171')) }}>
+                  {isEnterprise ? (enterprisePolicy.organizationName || 'Enterprise Team') : (licenseState.useType === 'personal' ? 'Personal (Free)' : (licenseState.isLicensed ? 'Commercial Pro' : `Eval (${licenseState.commercialDaysRemaining}d)`))}
                 </span>
               </div>
             </button>
@@ -495,6 +500,49 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
             {/* TAB 1: AI MODELS & BYOM */}
             {activeTab === 'models' && (
               <div className="settings-tab-body">
+                {isEnterprise && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px',
+                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(59, 130, 246, 0.08) 100%)',
+                    border: '1px solid rgba(99, 102, 241, 0.35)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '12px 14px',
+                    marginBottom: '12px'
+                  }}>
+                    <Building2 size={20} color="var(--primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                        <strong style={{ fontSize: '0.86rem', color: 'var(--text-primary)' }}>
+                          Managed by {enterprisePolicy.organizationName} IT Policy
+                        </strong>
+                        {isLocked && (
+                          <span style={{
+                            fontSize: '0.65rem',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            padding: '2px 8px',
+                            borderRadius: '999px',
+                            backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                            color: 'var(--primary)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            <Lock size={10} /> Locked by Admin
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                        {isLocked
+                          ? 'Your AI connection endpoint and model parameters are pre-configured and locked via corporate policy (C:\\ProgramData\\NativeLingo\\policy.json). Direct tampering is disabled.'
+                          : 'Your workstation has a corporate deployment policy applied by your IT administrator.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="settings-card">
                   <div className="settings-card-header">
                     <div className="settings-card-title">
@@ -502,7 +550,7 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                       <span>Model Provider</span>
                     </div>
                     <span style={{ fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 600, background: 'rgba(99, 102, 241, 0.12)', padding: '2px 8px', borderRadius: '4px' }}>
-                      BYOM Enabled
+                      {isEnterprise ? 'Enterprise BYOM' : 'BYOM Enabled'}
                     </span>
                   </div>
 
@@ -510,6 +558,7 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button
                       type="button"
+                      disabled={isLocked}
                       onClick={() => setAiProvider('gemini')}
                       style={{
                         flex: 1,
@@ -520,7 +569,8 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                         color: aiProvider === 'gemini' ? 'var(--text-primary)' : 'var(--text-secondary)',
                         fontWeight: 600,
                         fontSize: '0.8rem',
-                        cursor: 'pointer',
+                        cursor: isLocked ? 'not-allowed' : 'pointer',
+                        opacity: isLocked && aiProvider !== 'gemini' ? 0.5 : 1,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -534,6 +584,7 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
 
                     <button
                       type="button"
+                      disabled={isLocked}
                       onClick={() => setAiProvider('openai_compatible')}
                       style={{
                         flex: 1,
@@ -544,7 +595,8 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                         color: aiProvider === 'openai_compatible' ? 'var(--text-primary)' : 'var(--text-secondary)',
                         fontWeight: 600,
                         fontSize: '0.8rem',
-                        cursor: 'pointer',
+                        cursor: isLocked ? 'not-allowed' : 'pointer',
+                        opacity: isLocked && aiProvider !== 'openai_compatible' ? 0.5 : 1,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -604,10 +656,11 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                             id="api-key-input"
                             type={showKey ? 'text' : 'password'}
                             className="form-input"
-                            placeholder="AIzaSy..."
+                            placeholder={isLocked && enterprisePolicy.hasApiKey ? '•••••••••••••••• (Managed by Corporate IT Policy)' : 'AIzaSy...'}
+                            disabled={isLocked}
                             value={apiKey}
                             onChange={(e) => setApiKey(e.target.value)}
-                            style={{ paddingRight: '70px', fontFamily: 'var(--font-mono)' }}
+                            style={{ paddingRight: '70px', fontFamily: 'var(--font-mono)', opacity: isLocked ? 0.75 : 1, cursor: isLocked ? 'not-allowed' : 'text' }}
                           />
                           <button
                             type="button"
@@ -770,9 +823,10 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                           type="text"
                           className="form-input"
                           placeholder="http://localhost:11434/v1"
+                          disabled={isLocked}
                           value={customEndpoint}
                           onChange={(e) => setCustomEndpoint(e.target.value)}
-                          style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}
+                          style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', opacity: isLocked ? 0.75 : 1, cursor: isLocked ? 'not-allowed' : 'text' }}
                         />
                       </div>
 
@@ -782,9 +836,10 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                           type="text"
                           className="form-input"
                           placeholder="llama3.2, mistral, qwen2.5, deepseek-r1..."
+                          disabled={isLocked}
                           value={customModel}
                           onChange={(e) => setCustomModel(e.target.value)}
-                          style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}
+                          style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', opacity: isLocked ? 0.75 : 1, cursor: isLocked ? 'not-allowed' : 'text' }}
                         />
                       </div>
 
@@ -793,10 +848,11 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                         <input
                           type="password"
                           className="form-input"
-                          placeholder="Leave empty for local Ollama / LM Studio"
+                          placeholder={isLocked && enterprisePolicy.hasCustomApiKey ? '•••••••••••••••• (Managed by Corporate IT Policy)' : 'Leave empty for local Ollama / LM Studio'}
+                          disabled={isLocked}
                           value={customApiKey}
                           onChange={(e) => setCustomApiKey(e.target.value)}
-                          style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}
+                          style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', opacity: isLocked ? 0.75 : 1, cursor: isLocked ? 'not-allowed' : 'text' }}
                         />
                       </div>
 
@@ -1515,7 +1571,93 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
 
             {activeTab === 'license' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {/* 1. Usage Case Selector */}
+                {isEnterprise ? (
+                  <div className="settings-card" style={{
+                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(16, 185, 129, 0.08) 100%)',
+                    borderColor: 'rgba(99, 102, 241, 0.35)',
+                    padding: '20px',
+                    position: 'relative'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                      <div style={{
+                        width: '46px',
+                        height: '46px',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                        color: 'var(--primary)',
+                        flexShrink: 0
+                      }}>
+                        <Building2 size={26} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                              Enterprise Team License
+                            </span>
+                            <span style={{
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              padding: '2px 8px',
+                              borderRadius: '999px',
+                              backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                              color: 'var(--accent-emerald)'
+                            }}>
+                              Corporate Active
+                            </span>
+                          </div>
+                          {isLocked && (
+                            <span style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 600,
+                              color: 'var(--primary)',
+                              backgroundColor: 'rgba(99, 102, 241, 0.12)',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <Lock size={11} /> Machine Policy Enforced
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '8px', lineHeight: 1.5 }}>
+                          This workstation is registered to <strong>{enterprisePolicy.organizationName}</strong> under a centralized multi-user commercial enterprise agreement (EULA Section 4). All Pro productivity features, unlimited rewrite slots, in-place paste-back, and privacy protections are fully unlocked across your organization.
+                        </div>
+
+                        <div style={{ marginTop: '12px', padding: '10px 12px', borderRadius: '6px', background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Assigned License Identifier:</span>
+                          <span style={{ fontSize: '0.78rem', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {licenseState.licenseKey}
+                          </span>
+                        </div>
+
+                        <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          <div style={{ fontSize: '0.76rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Check size={14} color="#10b981" /> Centralized BYOM Inference Routing
+                          </div>
+                          <div style={{ fontSize: '0.76rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Check size={14} color="#10b981" /> Unlimited Workstation Activations
+                          </div>
+                          <div style={{ fontSize: '0.76rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Check size={14} color="#10b981" /> In-Place Instant Auto-Paste
+                          </div>
+                          <div style={{ fontSize: '0.76rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Check size={14} color="#10b981" /> Zero Data Telemetry / 100% Direct TLS
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* 1. Usage Case Selector */}
                 <div className="settings-card" style={{ padding: '14px 16px' }}>
                   <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
                     Select Your Deployment Type
@@ -1927,6 +2069,8 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                         </div>
                       </div>
                     </div>
+                  </>
+                )}
                   </>
                 )}
 

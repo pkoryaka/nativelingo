@@ -4,7 +4,7 @@ import {
   Monitor, RotateCw, Power, Keyboard, Zap, BookOpen, Languages, 
   AppWindow, Cpu, Server, Sun, Moon, Palette, Sliders, History,
   Star, Search, Check, Volume2, VolumeX, CreditCard, BadgeCheck, ShieldAlert, Award,
-  Building2, Lock
+  Building2, Lock, Clock
 } from 'lucide-react';
 import { AVAILABLE_MODELS, SUPPORTED_LANGUAGES, testGeminiApiKey, fetchLiveAvailableModels } from '../services/geminiService';
 import { storageService, ROLE_PRESET_PACKS } from '../services/storageService';

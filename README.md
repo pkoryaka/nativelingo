@@ -121,7 +121,7 @@ For IT administrators, cybersecurity teams, and corporate rollouts:
 * **Zero-Touch Machine Policy:** Deploy a single `C:\ProgramData\NativeLingo\policy.json` to configure and lock workstations to internal Azure OpenAI gateways, private company Ollama/vLLM servers, or enterprise Google Cloud keys.
 * **Tamper-Proofing:** Machine-wide policy locks settings against employee modification and masks API keys.
 * **Zero Telemetry & DLP Compliance:** Zero third-party telemetry or relay servers. Enable `"disableHistory": true` to prevent any text from being stored on local disks.
-* **Intune / SCCM / GPO Scripts:** See [`ENTERPRISE.md`](./ENTERPRISE.md) for full policy schema and PowerShell deployment scripts.
+* **Intune / SCCM / GPO Scripts:** See [`ENTERPRISE.md`](./ENTERPRISE.md) and [`CLIENT_LICENSING.md`](./CLIENT_LICENSING.md) for full policy schema, activation steps, and PowerShell deployment scripts.
 
 ---
 
@@ -131,7 +131,7 @@ For IT administrators, cybersecurity teams, and corporate rollouts:
 1. Download the latest `NativeLingo-Setup-x64.exe` from the [Releases](https://github.com/pkoryaka/nativelingo/releases) tab.
 2. Run the installer. NativeLingo will launch silently into your Windows System Tray.
 3. Open Settings (`Ctrl + Alt + T` $\rightarrow$ Settings gear icon):
-   - Choose **Google Gemini** (paste your free key from [Google AI Studio](https://aistudio.google.com/)) or select **Local Ollama** (`localhost:11434`).
+   - Choose your preferred AI provider (Google Gemini, OpenAI, Claude, DeepSeek, Groq, OpenRouter, Corporate One API, or Local Ollama).
 4. Select your target language and you are ready!
 
 ### Developer Setup (Build from Source)
@@ -153,5 +153,6 @@ npm run build
 ---
 
 ## 📜 License & Support
-* **Personal & Evaluation Use**: Free to use with personal Gemini or local models.
-* **Commercial Teams & Support Inquiries**: Open an issue or contact `support@nativelingo.app`.
+* **Personal & Educational Use**: 100% Free Forever under Section 3 of the [NativeLingo EULA](./LICENSE).
+* **Commercial & Workplace Deployment**: 40-day evaluation, followed by commercial licensing. See [`PRICING.md`](./PRICING.md) and [`CLIENT_LICENSING.md`](./CLIENT_LICENSING.md).
+* **Enterprise & Corporate Licensing**: Contact `licensing@businessintel.co.site`.

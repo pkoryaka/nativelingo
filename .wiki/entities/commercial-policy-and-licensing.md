@@ -15,23 +15,27 @@ NativeLingo implements a dual-use client-side licensing model with zero token ma
 
 ## Commercial License Tiers (For Business Operations)
 - **Personal & Educational**: $0 forever (EULA Sec. 3).
-- **Commercial Single-User Pro (Annual)**: $34 / year ($2.85/month equivalent). 1 named user across 2 workstations, all updates, priority support.
-- **Commercial Single-User Pro (Perpetual)**: $74 one-time ($59 launch promo for first 200 copies). 12 months updates included, optional $24/year renewal.
-- **Multi-User Team (Annual)**: $49 / seat / year (min 3 seats). Centralized license management, corporate tax/VAT invoices, priority SLA.
+- **Commercial Single-User Pro (Annual)**: $17 / year ($1.42/month equivalent). 1 named user across 2 workstations, all updates, priority support.
+- **Commercial Single-User Pro (Perpetual)**: $37 one-time ($29 launch promo for first 200 copies). 12 months updates included, optional $12/year renewal.
+- **Multi-User Team (Annual)**: $24 / seat / year (~$2.00/month, min 3 seats). Centralized license management, corporate tax/VAT invoices, priority SLA.
+- **Enterprise Managed**: $45 / seat / year (25-seat min) with offline Ed25519 signing and MDM/Intune deployment.
 
-## Implementation Details
-- **Engine**: `src/services/licenseService.js`:
-  - `useType`: `'personal'` (default, 100% free perpetual) | `'commercial'` (40-day trial / licensed).
-  - `isPro`: Always `true` for Personal use, and `true` during active commercial trial or when licensed.
-  - Feature gates (`canUseAutoPaste()`, `canUseSlot()`, `canUseJargonExplainer()`): Unlocked for all compliant users.
-- **Enterprise BYOM & Machine Policy Engine**:
-  - `C:\ProgramData\NativeLingo\policy.json` (or `userData/enterprise_policy.json`):
-  - Detected and loaded on Electron boot in `electron/main.cjs`.
-  - Machine-wide policy locks settings (`lockSettings: true`), pre-configures internal company proxy endpoints (`customEndpoint`), masks API keys (`customApiKey`), sets enterprise Gemini keys, and auto-enrolls into corporate Team License.
-  - Supports enterprise DLP: `"disableHistory": true` disables all local translation history disk persistence.
-  - Exposed to renderer via `window.electronAPI.getEnterprisePolicy()`.
-- **UI Components**:
-  - `src/components/SettingsModal.jsx`: Usage type selector (Personal vs Commercial), IT-managed banner (`🏢 Managed by [Org Name]`), settings locking, and commercial activation tools.
-  - `src/components/Header.jsx`: Badge displaying `🏢 [Org Name]` when managed, `Personal (Free)`, `Evaluation (Xd)`, or `Commercial Pro`.
-  - `ENTERPRISE.md`: Complete IT admin guide with Microsoft Intune, SCCM, and GPO PowerShell deployment scripts.
-  - `PRICING.md`: Detailed public pricing and terms of service.
+## Cryptographic Offline License Verification (Ed25519 Asymmetric Signatures)
+- **Zero-Cloud Air-Gapped Security**: Commercial enterprise clients on secure intranets or air-gapped workstations can activate their software without pinging an external server.
+- **Asymmetric Keypair**:
+  - Master Private Key (`scripts/keys/ed25519_private.pem`) is retained by developer/sales.
+  - Master Public Key is embedded into `electron/licenseVerifier.cjs`.
+- **Token Format**:
+  - `NL1-<base64url(payloadJSON)>.<base64url(signature)>`
+  - Payload JSON contains: `{ id, org, email, plan, seats, issuedAt, expiresAt }`.
+  - Signature is generated over the exact UTF-8 payload Base64 string using `crypto.sign(null, data, privateKey)`.
+- **Verification Engine**:
+  - `electron/licenseVerifier.cjs` validates the signature using `crypto.verify(null, data, publicKey, signature)`.
+  - Enforces expiration dates (`expiresAt: 'never'` or `YYYY-MM-DD`). If expired, returns `{ valid: false, expired: true }`.
+  - Tampered payloads fail digital signature checks immediately.
+- **Developer CLI**:
+  - `scripts/generate_license.cjs` allows issuing signed keys with custom parameters:
+    `node scripts/generate_license.cjs --org "Siemens Energy" --seats 50 --plan commercial_team --days 365`
+- **UI & State Binding**:
+  - `licenseService.js` and `SettingsModal.jsx` display verified organization badges, seat allocations, expiration dates, and the green `Ed25519 Cryptographically Signed & Verified (Offline Safe)` shield.
+

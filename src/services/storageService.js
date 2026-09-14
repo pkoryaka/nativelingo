@@ -1,11 +1,141 @@
 const STORAGE_KEYS = {
   API_KEY: 'gemini_translator_api_key',
+  PROVIDER_KEYS: 'gemini_translator_provider_keys',
   SETTINGS: 'gemini_translator_settings',
   HISTORY: 'gemini_translator_history',
   CUSTOM_PRESETS: 'gemini_translator_custom_presets',
   CACHED_MODELS: 'gemini_translator_cached_models',
   QUICK_SLOTS: 'gemini_translator_quick_slots'
 };
+
+export const AI_PROVIDERS = [
+  {
+    id: 'gemini',
+    name: 'Google Gemini',
+    tagline: 'Google AI Cloud Direct',
+    iconName: 'Sparkles',
+    badgeColor: '#6366f1',
+    endpoint: 'https://generativelanguage.googleapis.com',
+    defaultModel: 'gemini-flash-lite-latest',
+    placeholderKey: 'AIzaSy...',
+    keyUrl: 'https://aistudio.google.com/app/apikey',
+    popularModels: [
+      { id: 'gemini-flash-lite-latest', label: 'Flash Lite (Ultra Fast)' },
+      { id: 'gemini-3.5-flash-lite', label: '3.5 Flash Lite' },
+      { id: 'gemini-3.7-flash', label: '3.7 Flash' },
+      { id: 'gemini-2.5-pro', label: '2.5 Pro' }
+    ]
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    tagline: 'Direct OpenAI Cloud',
+    iconName: 'Bot',
+    badgeColor: '#10a37f',
+    endpoint: 'https://api.openai.com/v1',
+    defaultModel: 'gpt-4o-mini',
+    placeholderKey: 'sk-proj-...',
+    keyUrl: 'https://platform.openai.com/api-keys',
+    popularModels: [
+      { id: 'gpt-4o-mini', label: 'GPT-4o Mini (Fast & Cheap)' },
+      { id: 'gpt-4o', label: 'GPT-4o (Flagship)' },
+      { id: 'o3-mini', label: 'o3-mini (Reasoning)' }
+    ]
+  },
+  {
+    id: 'anthropic',
+    name: 'Anthropic Claude',
+    tagline: 'Direct Claude API',
+    iconName: 'Zap',
+    badgeColor: '#d97706',
+    endpoint: 'https://api.anthropic.com/v1',
+    defaultModel: 'claude-3-5-haiku-latest',
+    placeholderKey: 'sk-ant-api03-...',
+    keyUrl: 'https://console.anthropic.com/settings/keys',
+    popularModels: [
+      { id: 'claude-3-5-haiku-latest', label: '3.5 Haiku (Fast & Precise)' },
+      { id: 'claude-3-5-sonnet-latest', label: '3.5 Sonnet (State of the Art)' }
+    ]
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    tagline: 'DeepSeek Official API',
+    iconName: 'Cpu',
+    badgeColor: '#2563eb',
+    endpoint: 'https://api.deepseek.com/v1',
+    defaultModel: 'deepseek-chat',
+    placeholderKey: 'sk-...',
+    keyUrl: 'https://platform.deepseek.com/api_keys',
+    popularModels: [
+      { id: 'deepseek-chat', label: 'DeepSeek-V3 (Chat/Translate)' },
+      { id: 'deepseek-reasoner', label: 'DeepSeek-R1 (Reasoning)' }
+    ]
+  },
+  {
+    id: 'groq',
+    name: 'Groq (LPU)',
+    tagline: 'Sub-100ms Ultra Fast LPU',
+    iconName: 'Zap',
+    badgeColor: '#f97316',
+    endpoint: 'https://api.groq.com/openai/v1',
+    defaultModel: 'llama-3.3-70b-versatile',
+    placeholderKey: 'gsk_...',
+    keyUrl: 'https://console.groq.com/keys',
+    popularModels: [
+      { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B (Versatile)' },
+      { id: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B' }
+    ]
+  },
+  {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    tagline: 'Universal Model Aggregator',
+    iconName: 'Globe',
+    badgeColor: '#8b5cf6',
+    endpoint: 'https://openrouter.ai/api/v1',
+    defaultModel: 'google/gemini-2.0-flash-lite:free',
+    placeholderKey: 'sk-or-v1-...',
+    keyUrl: 'https://openrouter.ai/keys',
+    popularModels: [
+      { id: 'google/gemini-2.0-flash-lite:free', label: 'Gemini Flash Lite (Free)' },
+      { id: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet' },
+      { id: 'openai/gpt-4o-mini', label: 'GPT-4o Mini' }
+    ]
+  },
+  {
+    id: 'corporate_gateway',
+    name: 'Corporate One API',
+    tagline: 'Centralized Enterprise Gateway',
+    iconName: 'Building2',
+    badgeColor: '#a78bfa',
+    endpoint: 'https://oneapi.corp.internal/v1',
+    defaultModel: 'gpt-4o',
+    placeholderKey: 'sk-... (Corporate Gateway Token)',
+    keyUrl: '',
+    popularModels: [
+      { id: 'gpt-4o', label: 'GPT-4o' },
+      { id: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
+      { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' }
+    ]
+  },
+  {
+    id: 'openai_compatible',
+    name: 'Local LLM (Offline)',
+    tagline: '100% Private Local Hardware',
+    iconName: 'Server',
+    badgeColor: '#10b981',
+    endpoint: 'http://localhost:11434/v1',
+    defaultModel: 'llama3.2',
+    placeholderKey: 'Optional for Local',
+    keyUrl: '',
+    popularModels: [
+      { id: 'llama3.2', label: 'Llama 3.2 (Ollama)' },
+      { id: 'mistral', label: 'Mistral' },
+      { id: 'qwen2.5', label: 'Qwen 2.5' }
+    ]
+  }
+];
 
 export const DEFAULT_QUICK_SLOTS = [
   {
@@ -206,6 +336,68 @@ export const storageService = {
     storageService.syncToElectron();
   },
 
+  getProviderKeys: () => {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.PROVIDER_KEYS);
+      return data ? JSON.parse(data) : {};
+    } catch {
+      return {};
+    }
+  },
+
+  getProviderApiKey: (providerId = 'gemini') => {
+    if (enterprisePolicyCache?.lockSettings) {
+      if (providerId === 'gemini' && enterprisePolicyCache.hasApiKey) {
+        return localStorage.getItem(STORAGE_KEYS.API_KEY) || '••••••••••••••••';
+      }
+      if (enterprisePolicyCache.hasCustomApiKey) {
+        return localStorage.getItem(STORAGE_KEYS.API_KEY) || '••••••••••••••••';
+      }
+    }
+    if (providerId === 'gemini') {
+      return localStorage.getItem(STORAGE_KEYS.API_KEY) || '';
+    }
+    const keys = storageService.getProviderKeys();
+    if (keys[providerId]) return keys[providerId];
+    const settings = storageService.getSettings();
+    return settings.customApiKey || '';
+  },
+
+  getActiveModel: () => {
+    const settings = storageService.getSettings();
+    const provider = settings.aiProvider || 'gemini';
+    const meta = AI_PROVIDERS.find((p) => p.id === provider);
+    if (provider === 'gemini') {
+      return settings.customGeminiModel || settings.model || meta?.defaultModel || 'gemini-flash-lite-latest';
+    }
+    return settings.customModel || meta?.defaultModel || 'Custom';
+  },
+
+  hasActiveApiKey: () => {
+    const settings = storageService.getSettings();
+    const provider = settings.aiProvider || 'gemini';
+    if (provider === 'openai_compatible') return true;
+    const key = storageService.getProviderApiKey(provider);
+    return Boolean(key && key.trim());
+  },
+
+  setProviderApiKey: (providerId, key) => {
+    const trimmed = (key || '').trim();
+    if (providerId === 'gemini') {
+      storageService.setApiKey(trimmed);
+      return;
+    }
+    const keys = storageService.getProviderKeys();
+    keys[providerId] = trimmed;
+    localStorage.setItem(STORAGE_KEYS.PROVIDER_KEYS, JSON.stringify(keys));
+    const settings = storageService.getSettings();
+    if (settings.aiProvider === providerId) {
+      storageService.saveSettings({ ...settings, customApiKey: trimmed });
+    } else {
+      storageService.syncToElectron();
+    }
+  },
+
   getSettings: () => {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
@@ -279,17 +471,21 @@ export const storageService = {
 
   syncToElectron: () => {
     if (window.electronAPI?.syncConfig) {
-      const apiKey = localStorage.getItem(STORAGE_KEYS.API_KEY) || '';
       const settings = storageService.getSettings();
+      const currentProvider = settings.aiProvider || 'gemini';
+      const providerMeta = AI_PROVIDERS.find((p) => p.id === currentProvider);
+      const activeKey = storageService.getProviderApiKey(currentProvider);
+      const geminiKey = localStorage.getItem(STORAGE_KEYS.API_KEY) || '';
+      
       window.electronAPI.syncConfig({
-        apiKey,
+        apiKey: currentProvider === 'gemini' ? activeKey : geminiKey,
         primaryTargetLanguage: settings.primaryTargetLanguage || 'uk',
         model: settings.model || 'gemini-flash-lite-latest',
-        aiProvider: settings.aiProvider || 'gemini',
+        aiProvider: currentProvider,
         customGeminiModel: settings.customGeminiModel || '',
-        customEndpoint: settings.customEndpoint || 'http://localhost:11434/v1',
-        customApiKey: settings.customApiKey || '',
-        customModel: settings.customModel || 'llama3.2'
+        customEndpoint: settings.customEndpoint || (providerMeta?.endpoint || 'http://localhost:11434/v1'),
+        customApiKey: activeKey,
+        customModel: settings.customModel || (providerMeta?.defaultModel || 'llama3.2')
       });
     }
   },

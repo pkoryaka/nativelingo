@@ -3,7 +3,7 @@
  * Ultra-Optimized for Speed: Real-time token streaming, greedy decoding, preconnect, zero thinking delay.
  */
 
-import { storageService } from './storageService.js';
+import { storageService, AI_PROVIDERS } from './storageService.js';
 
 export const SUPPORTED_LANGUAGES = [
   { code: 'auto', name: 'Auto-Detect', nativeName: 'Автовизначення' },
@@ -280,23 +280,24 @@ export async function translateText({
   onStreamChunk = null
 }) {
   const currentSettings = storageService.getSettings();
-  const isCorporateGateway = currentSettings.aiProvider === 'corporate_gateway';
-  const isLocalLLM = currentSettings.aiProvider === 'openai_compatible';
-  const isBYOM = isCorporateGateway || isLocalLLM;
+  const currentProviderId = currentSettings.aiProvider || 'gemini';
+  const providerMeta = AI_PROVIDERS.find((p) => p.id === currentProviderId) || AI_PROVIDERS[0];
+  const activeKey = storageService.getProviderApiKey(currentProviderId) || apiKey || '';
 
-  if (!isBYOM && (!apiKey || !apiKey.trim())) {
-    throw new Error('API Key missing. Please click Settings ⚙️ and paste your Google Gemini API Key.');
+  if (currentProviderId !== 'openai_compatible' && (!activeKey || !activeKey.trim())) {
+    throw new Error(`API Key missing for ${providerMeta.name}. Please click Settings ⚙️ and enter your API Key.`);
   }
-  if (isCorporateGateway && !currentSettings.customEndpoint) {
+  if (currentProviderId === 'corporate_gateway' && !currentSettings.customEndpoint) {
     throw new Error('Corporate One API endpoint missing. Please enter your Corporate Gateway URL in Settings ⚙️.');
   }
 
   const trimmedText = text ? text.trim() : '';
   if (!trimmedText) return null;
 
-  const effectiveModel = model || currentSettings.model || 'gemini-flash-lite-latest';
-  const defaultByomModel = isCorporateGateway ? 'gpt-4o' : 'llama3.2';
-  const targetModel = isBYOM ? (currentSettings.customModel || defaultByomModel) : (currentSettings.customGeminiModel || effectiveModel);
+  const defaultModel = providerMeta.defaultModel;
+  const targetModel = (currentProviderId === 'gemini')
+    ? (currentSettings.customGeminiModel || model || currentSettings.model || defaultModel)
+    : (currentSettings.customModel || defaultModel);
 
   // 1. Check Local Memory Cache (Instant 0ms response)
   const cacheKey = getCacheKey(trimmedText, sourceLang, targetLang, customPrompt, explainJargon, targetModel);
@@ -353,14 +354,14 @@ Respond ONLY in JSON format:
   // Primary Engine: Native Node Translation Engine with direct SSE streaming (Bypasses Chromium background throttling)
   if (window.electronAPI?.nativeTranslate) {
     try {
-      const keyToPass = isBYOM ? (currentSettings.customApiKey || '') : (apiKey ? apiKey.trim() : '');
       const nativeRes = await window.electronAPI.nativeTranslate({
-        apiKey: keyToPass,
+        apiKey: activeKey,
         text: userText,
         targetLang: targetName,
         customPrompt,
         explainJargon,
-        model: targetModel
+        model: targetModel,
+        provider: currentProviderId
       });
 
       if (nativeRes?.rawOutput) {
@@ -408,14 +409,92 @@ Respond ONLY in JSON format:
     }
   }
 
-  // BYOM & Corporate One API Web Fetch Path
-  if (isBYOM) {
-    const defaultEndpoint = isCorporateGateway ? 'https://oneapi.corp.internal/v1' : 'http://localhost:11434/v1';
-    const baseUrl = (currentSettings.customEndpoint || defaultEndpoint).replace(/\/+$/, '');
+  // Web Fallback: Anthropic Claude Messages API
+  if (currentProviderId === 'anthropic') {
+    const baseUrl = (currentSettings.customEndpoint || providerMeta.endpoint).replace(/\/+$/, '');
+    const endpoint = `${baseUrl}/messages`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': activeKey,
+          'anthropic-version': '2023-06-01'
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: targetModel,
+          system: systemInstructionText,
+          messages: [{ role: 'user', content: userText }],
+          temperature: 0.1,
+          max_tokens: maxTokens
+        })
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error?.message || `Anthropic returned HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      const rawOutput = data.content?.[0]?.text || '';
+      if (!rawOutput) throw new Error(`Empty response from Anthropic model "${targetModel}"`);
+
+      if (explainJargon) {
+        try {
+          const cleanJson = rawOutput.replace(/```json\n?|\n?```/g, '').trim();
+          const parsed = JSON.parse(cleanJson);
+          const result = {
+            isExplained: true,
+            translation: parsed.translation || rawOutput,
+            plainLanguageMeaning: parsed.plainLanguageMeaning || '',
+            detectedTone: parsed.detectedTone || '',
+            jargonBreakdown: parsed.jargonBreakdown || [],
+            culturalNotes: parsed.culturalNotes || '',
+            detectedSourceLanguage: parsed.detectedSourceLanguage || sourceLang
+          };
+          if (onStreamChunk) onStreamChunk(result.translation);
+          translationCache.set(cacheKey, result);
+          return result;
+        } catch {
+          const fallbackResult = {
+            isExplained: true,
+            translation: rawOutput,
+            plainLanguageMeaning: rawOutput,
+            detectedTone: 'Neutral',
+            jargonBreakdown: []
+          };
+          if (onStreamChunk) onStreamChunk(fallbackResult.translation);
+          translationCache.set(cacheKey, fallbackResult);
+          return fallbackResult;
+        }
+      }
+
+      const standardResult = { isExplained: false, translation: rawOutput.trim() };
+      if (onStreamChunk) onStreamChunk(standardResult.translation);
+      translationCache.set(cacheKey, standardResult);
+      return standardResult;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      throw err;
+    }
+  }
+
+  // Web Fallback: OpenAI-Compatible Providers (OpenAI, DeepSeek, Groq, OpenRouter, Corporate Gateway, Local LLM)
+  if (currentProviderId !== 'gemini') {
+    const baseUrl = (currentSettings.customEndpoint || providerMeta.endpoint).replace(/\/+$/, '');
     const endpoint = `${baseUrl}/chat/completions`;
-    const bearer = currentSettings.customApiKey ? `Bearer ${currentSettings.customApiKey.trim()}` : (isCorporateGateway ? '' : 'Bearer ollama');
+    const bearer = activeKey ? `Bearer ${activeKey.trim()}` : '';
     const headers = { 'Content-Type': 'application/json' };
     if (bearer) headers['Authorization'] = bearer;
+    if (currentProviderId === 'openrouter') {
+      headers['HTTP-Referer'] = 'https://github.com/pkoryaka/nativelingo';
+      headers['X-Title'] = 'NativeLingo';
+    }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 12000);
@@ -445,7 +524,7 @@ Respond ONLY in JSON format:
 
       const data = await response.json();
       const rawOutput = data.choices?.[0]?.message?.content || '';
-      if (!rawOutput) throw new Error(`Empty response from gateway model "${targetModel}"`);
+      if (!rawOutput) throw new Error(`Empty response from model "${targetModel}"`);
 
       if (explainJargon) {
         try {
@@ -493,7 +572,7 @@ Respond ONLY in JSON format:
   // FAST PATH: Real-time streaming for instant TTFT (<150ms) for Google Gemini Cloud
   const isStreaming = Boolean(onStreamChunk) && !explainJargon;
   if (isStreaming) {
-    const streamEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:streamGenerateContent?alt=sse&key=${apiKey.trim()}`;
+    const streamEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:streamGenerateContent?alt=sse&key=${activeKey.trim()}`;
     const payload = {
       systemInstruction: { parts: [{ text: systemInstructionText }] },
       contents: [{ role: 'user', parts: [{ text: userText }] }],
@@ -572,7 +651,7 @@ Respond ONLY in JSON format:
   }
 
   // DIRECT PATH: Non-streaming generateContent
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey.trim()}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${activeKey.trim()}`;
   const payload = {
     systemInstruction: { parts: [{ text: systemInstructionText }] },
     contents: [{ role: 'user', parts: [{ text: userText }] }],

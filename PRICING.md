@@ -40,7 +40,7 @@ NativeLingo follows a **Fair-Code / Dual-Use Commercial Model** governed by the 
 For businesses and organizations deploying NativeLingo after the 40-day evaluation period:
 
 ### A. Single-User Commercial Pro (Annual)
-- **Price**: **$34 / year** (~$2.85 / month, billed annually)
+- **Price**: **$17 / year** (~$1.42 / month, billed annually)
 - **Included**:
   - Full commercial license for 1 named user across up to 2 workstations.
   - All minor and major software updates released during the subscription.
@@ -48,17 +48,18 @@ For businesses and organizations deploying NativeLingo after the 40-day evaluati
   - 14-day no-questions-asked money-back guarantee.
 
 ### B. Single-User Commercial Perpetual (Lifetime License)
-- **Price**: **$74 one-time**
-- **Launch Special**: **$59** (first 200 copies with promo code `EARLYBIRD`)
+- **Price**: **$37 one-time**
+- **Launch Special**: **$29** (first 200 copies with promo code `EARLYBIRD`)
 - **Included**:
   - Perpetual right to use the purchased version forever for commercial operations.
   - 12 full months of major and minor updates included.
-  - Optional subsequent year maintenance renewal at **$24 / year** for continued updates.
+  - Optional subsequent year maintenance renewal at **$12 / year** for continued updates.
 
 ### C. Multi-User Team & Corporate License
-- **Price**: **$49 / seat / year** (minimum 3 seats)
+- **Price**: **$24 / seat / year** (~$2.00 / user / month, minimum 3 seats)
 - **Included**:
   - Centralized license key management and seat reassignment dashboard.
+  - Cryptographic offline signed Ed25519 license keys.
   - Corporate VAT / GST compliant invoices and wire / ACH payment options.
   - Shared team prompt templates and glossary configurations.
   - Dedicated support SLA.

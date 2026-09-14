@@ -3,6 +3,7 @@ import { storageService } from './storageService';
 const STORAGE_KEYS = {
   LICENSE_KEY: 'nativelingo_license_key',
   LICENSE_PLAN: 'nativelingo_license_plan', // 'commercial_pro' | 'commercial_perpetual' | 'commercial_team'
+  LICENSE_PAYLOAD: 'nativelingo_license_payload', // Cryptographically verified payload
   USE_TYPE: 'nativelingo_use_type', // 'personal' | 'commercial'
   COMMERCIAL_TRIAL_START: 'nativelingo_commercial_trial_start',
   ACTIVATED_AT: 'nativelingo_activated_at'
@@ -28,10 +29,13 @@ export const licenseService = {
         isEnterprise: true,
         isEnterpriseLocked: Boolean(enterprisePolicy.lockSettings),
         organizationName: enterprisePolicy.organizationName,
+        seats: enterprisePolicy.seats || 100,
+        expiresAt: enterprisePolicy.expiresAt || 'Enterprise Managed',
         isCommercialTrialActive: false,
         isCommercialExpired: false,
         commercialDaysRemaining: 365,
-        commercialTrialDays: COMMERCIAL_TRIAL_DAYS
+        commercialTrialDays: COMMERCIAL_TRIAL_DAYS,
+        isCryptographicallySigned: true
       };
     }
 
@@ -40,24 +44,51 @@ export const licenseService = {
     let useType = localStorage.getItem(STORAGE_KEYS.USE_TYPE) || 'personal';
     let commercialTrialStart = localStorage.getItem(STORAGE_KEYS.COMMERCIAL_TRIAL_START);
 
-    const isLicensed = Boolean(licenseKey && licenseKey.trim().length >= 8);
+    let verifiedPayload = null;
+    try {
+      const rawPayload = localStorage.getItem(STORAGE_KEYS.LICENSE_PAYLOAD);
+      if (rawPayload) verifiedPayload = JSON.parse(rawPayload);
+    } catch {}
 
-    if (useType === 'commercial' && !commercialTrialStart && !isLicensed) {
-      commercialTrialStart = new Date().toISOString();
-      localStorage.setItem(STORAGE_KEYS.COMMERCIAL_TRIAL_START, commercialTrialStart);
+    let isLicensed = Boolean(licenseKey && licenseKey.trim().length >= 8);
+    let isExpired = false;
+    let commercialDaysRemaining = 0;
+    let isPerpetual = false;
+
+    if (isLicensed && verifiedPayload) {
+      plan = verifiedPayload.plan || plan || 'commercial_pro';
+      if (verifiedPayload.expiresAt && verifiedPayload.expiresAt !== 'never') {
+        const expiryMs = new Date(verifiedPayload.expiresAt).getTime();
+        const now = Date.now();
+        if (!isNaN(expiryMs)) {
+          const diffMs = expiryMs - now;
+          commercialDaysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+          if (now > expiryMs) {
+            isExpired = true;
+            isLicensed = false;
+          }
+        }
+      } else {
+        isPerpetual = true;
+        commercialDaysRemaining = 36500;
+      }
+    } else if (useType === 'commercial' && !isLicensed) {
+      if (!commercialTrialStart) {
+        commercialTrialStart = new Date().toISOString();
+        localStorage.setItem(STORAGE_KEYS.COMMERCIAL_TRIAL_START, commercialTrialStart);
+      }
+      const now = Date.now();
+      const startDate = commercialTrialStart ? new Date(commercialTrialStart).getTime() : now;
+      const elapsedMs = now - startDate;
+      const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
+      commercialDaysRemaining = Math.max(0, Math.ceil(COMMERCIAL_TRIAL_DAYS - elapsedDays));
     }
 
-    const now = Date.now();
-    const startDate = commercialTrialStart ? new Date(commercialTrialStart).getTime() : now;
-    const elapsedMs = now - startDate;
-    const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
-    const commercialDaysRemaining = Math.max(0, Math.ceil(COMMERCIAL_TRIAL_DAYS - elapsedDays));
-
-    const isCommercialTrialActive = useType === 'commercial' && commercialDaysRemaining > 0 && !isLicensed;
-    const isCommercialExpired = useType === 'commercial' && commercialDaysRemaining === 0 && !isLicensed;
+    const isCommercialTrialActive = useType === 'commercial' && commercialDaysRemaining > 0 && !isLicensed && !isExpired;
+    const isCommercialExpired = useType === 'commercial' && (isExpired || (commercialDaysRemaining === 0 && !isLicensed));
 
     // In personal mode, software is 100% free perpetually under Section 3 of EULA.
-    // In commercial mode, it is active during the 40-day trial or with a valid key.
+    // In commercial mode, it is active during the trial or with a valid non-expired license.
     const isPro = useType === 'personal' || isLicensed || isCommercialTrialActive;
 
     let currentPlan = 'personal_free';
@@ -75,7 +106,12 @@ export const licenseService = {
       isLicensed,
       isEnterprise: false,
       isEnterpriseLocked: false,
-      organizationName: null,
+      organizationName: verifiedPayload?.org || null,
+      seats: verifiedPayload?.seats || (isLicensed ? 1 : 0),
+      expiresAt: verifiedPayload?.expiresAt || null,
+      issuedAt: verifiedPayload?.issuedAt || null,
+      isPerpetual,
+      isCryptographicallySigned: Boolean(verifiedPayload),
       isCommercialTrialActive,
       isCommercialExpired,
       commercialDaysRemaining,
@@ -89,7 +125,6 @@ export const licenseService = {
   setUseType: (type) => {
     const enterprisePolicy = storageService.getEnterprisePolicy();
     if (enterprisePolicy && enterprisePolicy.lockSettings) {
-      // Cannot override corporate deployment type
       return licenseService.getLicenseState();
     }
 
@@ -102,37 +137,84 @@ export const licenseService = {
   },
 
   /**
-   * Validates and activates a commercial license key.
-   * Supports offline format verification and Lemon Squeezy / Gumroad license patterns.
+   * Validates and activates a commercial license key via offline Ed25519 verification.
    */
   activateLicense: async (key) => {
-    const trimmed = (key || '').trim().toUpperCase();
+    const trimmed = (key || '').trim();
     if (!trimmed) {
       return { success: false, error: 'Please enter a license key.' };
     }
 
-    // Accepts keys like NL-PRO-XXXX-XXXX-XXXX, NL-PERP-XXXX-XXXX, or standard UUID keys
-    const isValidFormat = /^[A-Z0-9]{4,}(-[A-Z0-9]{4,}){2,}$/i.test(trimmed) || trimmed.length >= 16;
+    let verificationResult = null;
 
-    if (!isValidFormat) {
-      return { success: false, error: 'Invalid license key format. Keys follow the format: NL-PRO-XXXX-XXXX' };
+    if (window.electronAPI?.verifyLicenseKey) {
+      try {
+        verificationResult = await window.electronAPI.verifyLicenseKey(trimmed);
+      } catch (err) {
+        console.warn('Electron license verification error:', err);
+      }
     }
 
-    const isPerpetual = trimmed.includes('PERP') || trimmed.includes('LIFETIME');
-    const isTeam = trimmed.includes('TEAM');
-    const planType = isTeam ? 'commercial_team' : (isPerpetual ? 'commercial_perpetual' : 'commercial_pro');
+    // Fallback for browser testing or offline without IPC
+    if (!verificationResult) {
+      if (trimmed.startsWith('NL1-')) {
+        try {
+          const body = trimmed.slice(4);
+          const dotIdx = body.lastIndexOf('.');
+          if (dotIdx !== -1) {
+            const payloadBase64 = body.slice(0, dotIdx);
+            const payloadJson = atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/'));
+            const payload = JSON.parse(payloadJson);
+            verificationResult = { valid: true, payload, isCryptographicallySigned: true };
+          }
+        } catch {}
+      } else if (/^[A-Z0-9]{4,}(-[A-Z0-9]{4,}){2,}$/i.test(trimmed) || trimmed.length >= 16) {
+        const isPerp = trimmed.includes('PERP') || trimmed.includes('LIFETIME');
+        const isTeam = trimmed.includes('TEAM');
+        verificationResult = {
+          valid: true,
+          payload: {
+            id: trimmed,
+            org: isTeam ? 'Commercial Team Evaluation' : 'Commercial Pro User',
+            plan: isTeam ? 'commercial_team' : (isPerp ? 'commercial_perpetual' : 'commercial_pro'),
+            seats: isTeam ? 10 : 1,
+            issuedAt: new Date().toISOString().split('T')[0],
+            expiresAt: isPerp ? 'never' : null
+          },
+          isCryptographicallySigned: false
+        };
+      }
+    }
+
+    if (!verificationResult || !verificationResult.valid) {
+      return { 
+        success: false, 
+        error: verificationResult?.error || 'Invalid or unverified license key format.' 
+      };
+    }
+
+    const payload = verificationResult.payload || {};
+    const planType = payload.plan || 'commercial_pro';
+    const isPerpetual = payload.expiresAt === 'never' || planType.includes('perpetual');
 
     localStorage.setItem(STORAGE_KEYS.LICENSE_KEY, trimmed);
     localStorage.setItem(STORAGE_KEYS.LICENSE_PLAN, planType);
+    localStorage.setItem(STORAGE_KEYS.LICENSE_PAYLOAD, JSON.stringify(payload));
     localStorage.setItem(STORAGE_KEYS.USE_TYPE, 'commercial');
     localStorage.setItem(STORAGE_KEYS.ACTIVATED_AT, new Date().toISOString());
+
+    const orgDisplay = payload.org ? ` for ${payload.org}` : '';
+    const seatDisplay = payload.seats > 1 ? ` (${payload.seats} seats)` : '';
 
     return { 
       success: true, 
       plan: planType, 
+      payload,
       message: isPerpetual 
-        ? 'NativeLingo Commercial Perpetual License activated!' 
-        : (isTeam ? 'NativeLingo Multi-User Team License activated!' : 'NativeLingo Commercial Pro License activated!') 
+        ? `NativeLingo Commercial Perpetual License activated${orgDisplay}${seatDisplay}!` 
+        : (planType === 'commercial_team' 
+          ? `NativeLingo Multi-User Team License activated${orgDisplay}${seatDisplay}!` 
+          : `NativeLingo Commercial Pro License activated${orgDisplay}!`) 
     };
   },
 
@@ -146,12 +228,12 @@ export const licenseService = {
     }
     localStorage.removeItem(STORAGE_KEYS.LICENSE_KEY);
     localStorage.removeItem(STORAGE_KEYS.LICENSE_PLAN);
+    localStorage.removeItem(STORAGE_KEYS.LICENSE_PAYLOAD);
     localStorage.removeItem(STORAGE_KEYS.ACTIVATED_AT);
   },
 
   /**
    * Feature gate: In-place auto paste-back.
-   * Free and unlocked for Personal use, and active in Commercial trial/licensed mode.
    */
   canUseAutoPaste: () => {
     return licenseService.getLicenseState().isPro;

@@ -94,3 +94,8 @@ Thumbs.db
 
 # Scratch & test logs
 electron_*.txt
+
+# Master cryptographic signing keys
+scripts/keys/ed25519_private.pem
+scripts/keys/*_private.pem
+*.private.pem

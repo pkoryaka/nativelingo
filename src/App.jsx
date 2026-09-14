@@ -9,12 +9,14 @@ import { HistoryDrawer } from './components/HistoryDrawer';
 import { MiniTranslatePopup } from './components/MiniTranslatePopup';
 import { translateText } from './services/geminiService';
 import { storageService } from './services/storageService';
+import { licenseService } from './services/licenseService';
 import { ttsService } from './services/ttsService';
 import { Zap } from 'lucide-react';
 
 export function App() {
   const [settings, setSettings] = useState(storageService.getSettings());
   const [apiKey, setApiKey] = useState(storageService.getApiKey());
+  const [licenseState, setLicenseState] = useState(() => licenseService.getLicenseState());
 
   const [sourceLang, setSourceLang] = useState('auto');
   const [targetLang, setTargetLang] = useState(settings.primaryTargetLanguage || 'uk');
@@ -60,6 +62,7 @@ export function App() {
     const updated = storageService.getSettings();
     setSettings(updated);
     setApiKey(storageService.getApiKey());
+    setLicenseState(licenseService.getLicenseState());
     if (updated.theme && updated.theme !== theme) {
       setTheme(updated.theme);
       document.documentElement.setAttribute('data-theme', updated.theme);
@@ -362,20 +365,9 @@ export function App() {
 
       {/* Header */}
       <Header
-        currentModel={
-          settings.aiProvider === 'corporate_gateway'
-            ? (settings.customModel || 'One API Gateway')
-            : settings.aiProvider === 'openai_compatible'
-              ? (settings.customModel || 'Local LLM')
-              : (settings.customGeminiModel || settings.model || 'gemini-flash-lite-latest')
-        }
-        hasApiKey={
-          settings.aiProvider === 'corporate_gateway'
-            ? Boolean(settings.customEndpoint)
-            : settings.aiProvider === 'openai_compatible'
-              ? true
-              : Boolean(apiKey)
-        }
+        currentModel={storageService.getActiveModel()}
+        hasApiKey={storageService.hasActiveApiKey()}
+        license={licenseState}
         theme={theme}
         onToggleTheme={handleToggleTheme}
         onOpenSettings={handleOpenSettings}

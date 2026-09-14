@@ -18,8 +18,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   nativeTranslate: (options) => ipcRenderer.invoke('native:translate', options),
   fetchLiveModels: (apiKey) => ipcRenderer.invoke('models:fetch', apiKey),
   testEndpoint: (cfg) => ipcRenderer.invoke('endpoint:test', cfg),
+  openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
   syncConfig: (cfg) => ipcRenderer.invoke('config:sync', cfg),
   getEnterprisePolicy: () => ipcRenderer.invoke('enterprise:get-policy'),
+  verifyLicenseKey: (key) => ipcRenderer.invoke('license:verify-key', key),
   synthesizeSpeech: (options) => ipcRenderer.invoke('tts:synthesize', options),
   onStreamChunk: (callback) => {
     const subscription = (event, data) => callback(data);

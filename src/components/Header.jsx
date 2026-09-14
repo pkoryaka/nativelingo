@@ -1,18 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { Languages, Settings, History, Sparkles, Sun, Moon, ShieldCheck, Cloud, BadgeCheck, Clock, Building2 } from 'lucide-react';
-import { storageService } from '../services/storageService';
+import { 
+  Languages, Settings, History, Sparkles, Sun, Moon, ShieldCheck, 
+  Cloud, BadgeCheck, Clock, Building2, Bot, Zap, Cpu, Globe, Server 
+} from 'lucide-react';
+import { storageService, AI_PROVIDERS } from '../services/storageService';
 import { licenseService } from '../services/licenseService';
 import appLogo from '../assets/app-icon.png';
 
-export function Header({ currentModel, onOpenSettings, onOpenHistory, hasApiKey, theme, onToggleTheme }) {
+export function Header({ currentModel, onOpenSettings, onOpenHistory, hasApiKey, theme, onToggleTheme, license: propLicense }) {
   const settings = storageService.getSettings();
-  const isCorporate = settings.aiProvider === 'corporate_gateway';
-  const isLocalAi = settings.aiProvider === 'openai_compatible';
-  const [license, setLicense] = useState(() => licenseService.getLicenseState());
+  const currentProviderId = settings.aiProvider || 'gemini';
+  const providerMeta = AI_PROVIDERS.find((p) => p.id === currentProviderId) || AI_PROVIDERS[0];
+  const [internalLicense, setInternalLicense] = useState(() => licenseService.getLicenseState());
 
   useEffect(() => {
-    setLicense(licenseService.getLicenseState());
-  }, [currentModel]);
+    setInternalLicense(licenseService.getLicenseState());
+  }, [currentModel, propLicense]);
+
+  const license = propLicense || internalLicense;
+
+  const renderProviderIcon = (iconName, size = 13) => {
+    switch (iconName) {
+      case 'Bot': return <Bot size={size} />;
+      case 'Zap': return <Zap size={size} />;
+      case 'Cpu': return <Cpu size={size} />;
+      case 'Globe': return <Globe size={size} />;
+      case 'Building2': return <Building2 size={size} />;
+      case 'Server': return <Server size={size} />;
+      case 'ShieldCheck': return <ShieldCheck size={size} />;
+      case 'Sparkles':
+      default:
+        return <Sparkles size={size} />;
+    }
+  };
 
   return (
     <header className="app-header">
@@ -114,35 +134,15 @@ export function Header({ currentModel, onOpenSettings, onOpenHistory, hasApiKey,
         {/* Transparent Data Routing Badge */}
         <button
           type="button"
-          onClick={onOpenSettings}
-          title={
-            isCorporate
-              ? "Routing: Central Corporate AI Gateway (One API / LiteLLM Proxy)"
-              : isLocalAi
-                ? "Routing: 100% Private Local AI (Ollama/LM Studio)"
-                : "Routing: Google Gemini Direct Cloud"
-          }
+          onClick={() => onOpenSettings && onOpenSettings('models')}
+          title={`Routing: ${providerMeta.name} (${providerMeta.tagline || ''})`}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '5px',
-            background: isCorporate
-              ? 'rgba(139, 92, 246, 0.15)'
-              : isLocalAi
-                ? 'rgba(16, 185, 129, 0.12)'
-                : 'rgba(99, 102, 241, 0.12)',
-            border: `1px solid ${
-              isCorporate
-                ? 'rgba(139, 92, 246, 0.35)'
-                : isLocalAi
-                  ? 'rgba(16, 185, 129, 0.3)'
-                  : 'rgba(99, 102, 241, 0.3)'
-            }`,
-            color: isCorporate
-              ? '#a78bfa'
-              : isLocalAi
-                ? '#10b981'
-                : 'var(--primary)',
+            background: `${providerMeta.badgeColor}22`,
+            border: `1px solid ${providerMeta.badgeColor}55`,
+            color: providerMeta.badgeColor,
             padding: '4px 9px',
             borderRadius: '999px',
             fontSize: '0.72rem',
@@ -150,22 +150,8 @@ export function Header({ currentModel, onOpenSettings, onOpenHistory, hasApiKey,
             cursor: 'pointer'
           }}
         >
-          {isCorporate ? (
-            <>
-              <Building2 size={13} />
-              <span>Corporate One API</span>
-            </>
-          ) : isLocalAi ? (
-            <>
-              <ShieldCheck size={13} />
-              <span>Local AI</span>
-            </>
-          ) : (
-            <>
-              <Cloud size={13} />
-              <span>Cloud Direct</span>
-            </>
-          )}
+          {renderProviderIcon(providerMeta.iconName)}
+          <span>{providerMeta.name}</span>
         </button>
 
         <button 

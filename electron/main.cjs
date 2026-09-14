@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, shell, clipboard, Tray, Menu, nativeImage, 
 const path = require('path');
 const { exec, execFile } = require('child_process');
 const fs = require('fs');
+const { verifyLicenseKey } = require('./licenseVerifier.cjs');
 
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -148,10 +149,105 @@ function getConfigPath() {
   return path.join(userData, 'config.json');
 }
 
-function prewarmGoogleSocket() {
-  if (savedAiProvider === 'gemini') {
-    fetch('https://generativelanguage.googleapis.com', { method: 'HEAD' }).catch(() => {});
+const KNOWN_PROVIDER_DEFAULTS = {
+  gemini: {
+    protocol: 'gemini',
+    endpoint: 'https://generativelanguage.googleapis.com',
+    defaultModel: 'gemini-flash-lite-latest'
+  },
+  openai: {
+    protocol: 'openai_compat',
+    endpoint: 'https://api.openai.com/v1',
+    defaultModel: 'gpt-4o-mini'
+  },
+  anthropic: {
+    protocol: 'anthropic',
+    endpoint: 'https://api.anthropic.com/v1',
+    defaultModel: 'claude-3-5-haiku-latest'
+  },
+  deepseek: {
+    protocol: 'openai_compat',
+    endpoint: 'https://api.deepseek.com/v1',
+    defaultModel: 'deepseek-chat'
+  },
+  groq: {
+    protocol: 'openai_compat',
+    endpoint: 'https://api.groq.com/openai/v1',
+    defaultModel: 'llama-3.3-70b-versatile'
+  },
+  openrouter: {
+    protocol: 'openai_compat',
+    endpoint: 'https://openrouter.ai/api/v1',
+    defaultModel: 'google/gemini-2.0-flash-lite:free'
+  },
+  corporate_gateway: {
+    protocol: 'openai_compat',
+    endpoint: 'https://oneapi.corp.internal/v1',
+    defaultModel: 'gpt-4o'
+  },
+  openai_compatible: {
+    protocol: 'openai_compat',
+    endpoint: 'http://localhost:11434/v1',
+    defaultModel: 'llama3.2'
   }
+};
+
+function resolveActiveProviderConfig({ provider, endpoint, model, apiKey } = {}) {
+  const activeProv = provider || savedAiProvider || 'gemini';
+  const defaults = KNOWN_PROVIDER_DEFAULTS[activeProv] || KNOWN_PROVIDER_DEFAULTS.gemini;
+
+  let resolvedEndpoint = endpoint;
+  if (!resolvedEndpoint) {
+    if (activeProv === 'corporate_gateway' || activeProv === 'openai_compatible') {
+      resolvedEndpoint = savedCustomEndpoint || defaults.endpoint;
+    } else {
+      const hasCustomOverride = savedCustomEndpoint &&
+        !savedCustomEndpoint.includes('localhost') &&
+        !savedCustomEndpoint.includes('127.0.0.1') &&
+        !savedCustomEndpoint.includes('oneapi.corp') &&
+        !savedCustomEndpoint.includes('generativelanguage');
+      resolvedEndpoint = hasCustomOverride ? savedCustomEndpoint : defaults.endpoint;
+    }
+  }
+
+  let resolvedKey = apiKey;
+  if (!resolvedKey) {
+    resolvedKey = (activeProv === 'gemini') ? savedApiKey : (savedCustomApiKey || savedApiKey);
+  }
+
+  let resolvedModel = model;
+  if (!resolvedModel) {
+    if (activeProv === 'gemini') {
+      resolvedModel = savedCustomGeminiModel || savedModel || defaults.defaultModel;
+    } else {
+      resolvedModel = savedCustomModel || defaults.defaultModel;
+    }
+  }
+
+  return {
+    provider: activeProv,
+    protocol: defaults.protocol,
+    endpoint: (resolvedEndpoint || defaults.endpoint).replace(/\/+$/, ''),
+    model: resolvedModel || defaults.defaultModel,
+    apiKey: (resolvedKey || '').trim()
+  };
+}
+
+function prewarmGoogleSocket() {
+  try {
+    const prov = savedAiProvider || 'gemini';
+    if (prov === 'gemini') {
+      fetch('https://generativelanguage.googleapis.com', { method: 'HEAD' }).catch(() => {});
+    } else if (prov === 'openai') {
+      fetch('https://api.openai.com', { method: 'HEAD' }).catch(() => {});
+    } else if (prov === 'anthropic') {
+      fetch('https://api.anthropic.com', { method: 'HEAD' }).catch(() => {});
+    } else if (prov === 'deepseek') {
+      fetch('https://api.deepseek.com', { method: 'HEAD' }).catch(() => {});
+    } else if (prov === 'groq') {
+      fetch('https://api.groq.com', { method: 'HEAD' }).catch(() => {});
+    }
+  } catch {}
 }
 
 function loadSavedConfig() {
@@ -619,77 +715,205 @@ function focusAppWindow(isMini = false) {
 let activeDirectStream = null;
 
 async function executeDirectNodeStream({ text, targetLang }) {
-  const key = savedApiKey;
-  if (!key) return null;
-
   const target = targetLang || savedTargetLang || 'ru';
-  const fastModel = 'gemini-flash-lite-latest';
   const systemInstructionText = `Translate into ${target}. Output direct translation only without quotes, preamble, or commentary.`;
+  const cfg = resolveActiveProviderConfig();
+
+  if (cfg.provider !== 'openai_compatible' && !cfg.apiKey) return null;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
   let accumulatedText = '';
 
   try {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${fastModel}:streamGenerateContent?alt=sse&key=${key.trim()}`;
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemInstructionText }] },
-        contents: [{ role: 'user', parts: [{ text }] }],
-        generationConfig: {
-          temperature: 0.0,
-          maxOutputTokens: Math.max(128, Math.min(1024, text.length * 3)),
-          candidateCount: 1
-        }
-      })
-    });
-    clearTimeout(timeoutId);
+    if (cfg.protocol === 'anthropic') {
+      const endpoint = `${cfg.endpoint}/messages`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': cfg.apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: cfg.model,
+          system: systemInstructionText,
+          messages: [{ role: 'user', content: text }],
+          stream: true,
+          max_tokens: Math.max(128, Math.min(1024, text.length * 3)),
+          temperature: 0.0
+        })
+      });
+      clearTimeout(timeoutId);
 
-    if (response.ok && response.body) {
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let buffer = '';
-      let isDone = false;
+      if (response.ok && response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        let isDone = false;
 
-      while (!isDone) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        while (!isDone) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split(/\r?\n/);
-        buffer = lines.pop() || '';
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split(/\r?\n/);
+          buffer = lines.pop() || '';
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('data:')) {
-            const jsonStr = trimmed.replace(/^data:\s*/, '').trim();
-            if (jsonStr) {
-              try {
-                const parsed = JSON.parse(jsonStr);
-                const candidate = parsed.candidates?.[0];
-                const chunk = candidate?.content?.parts?.[0]?.text || '';
-                if (chunk) {
-                  accumulatedText += chunk;
-                  if (mainWindow && !mainWindow.isDestroyed()) {
-                    mainWindow.webContents.send('quick-translate-chunk', accumulatedText);
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data:')) {
+              const jsonStr = trimmed.replace(/^data:\s*/, '').trim();
+              if (jsonStr) {
+                try {
+                  const parsed = JSON.parse(jsonStr);
+                  if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+                    accumulatedText += parsed.delta.text;
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                      mainWindow.webContents.send('quick-translate-chunk', accumulatedText);
+                    }
+                  } else if (parsed.type === 'message_stop' || (parsed.type === 'message_delta' && parsed.delta?.stop_reason)) {
+                    isDone = true;
+                    break;
                   }
-                }
-                if (candidate?.finishReason) {
-                  isDone = true;
-                  break;
-                }
-              } catch {}
+                } catch {}
+              }
             }
           }
         }
+        try { reader.cancel(); } catch {}
+        if (accumulatedText && accumulatedText.trim()) return accumulatedText.trim();
       }
-      try { reader.cancel(); } catch {}
+    } else if (cfg.protocol === 'openai_compat') {
+      const endpoint = `${cfg.endpoint}/chat/completions`;
+      const headers = { 'Content-Type': 'application/json' };
+      if (cfg.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+      if (cfg.provider === 'openrouter') {
+        headers['HTTP-Referer'] = 'https://github.com/pkoryaka/nativelingo';
+        headers['X-Title'] = 'NativeLingo';
+      }
 
-      if (accumulatedText && accumulatedText.trim()) {
-        return accumulatedText.trim();
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: cfg.model,
+          messages: [
+            { role: 'system', content: systemInstructionText },
+            { role: 'user', content: text }
+          ],
+          temperature: 0.0,
+          stream: true,
+          max_tokens: Math.max(128, Math.min(1024, text.length * 3))
+        })
+      });
+      clearTimeout(timeoutId);
+
+      if (response.ok && response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        let isDone = false;
+
+        while (!isDone) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split(/\r?\n/);
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data:')) {
+              const jsonStr = trimmed.replace(/^data:\s*/, '').trim();
+              if (jsonStr === '[DONE]') {
+                isDone = true;
+                break;
+              }
+              if (jsonStr) {
+                try {
+                  const parsed = JSON.parse(jsonStr);
+                  const chunk = parsed.choices?.[0]?.delta?.content || '';
+                  if (chunk) {
+                    accumulatedText += chunk;
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                      mainWindow.webContents.send('quick-translate-chunk', accumulatedText);
+                    }
+                  }
+                  if (parsed.choices?.[0]?.finish_reason) {
+                    isDone = true;
+                    break;
+                  }
+                } catch {}
+              }
+            }
+          }
+        }
+        try { reader.cancel(); } catch {}
+        if (accumulatedText && accumulatedText.trim()) return accumulatedText.trim();
+      }
+    } else {
+      // Default: Google Gemini SSE
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model}:streamGenerateContent?alt=sse&key=${cfg.apiKey}`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemInstructionText }] },
+          contents: [{ role: 'user', parts: [{ text }] }],
+          generationConfig: {
+            temperature: 0.0,
+            maxOutputTokens: Math.max(128, Math.min(1024, text.length * 3)),
+            candidateCount: 1
+          }
+        })
+      });
+      clearTimeout(timeoutId);
+
+      if (response.ok && response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        let isDone = false;
+
+        while (!isDone) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split(/\r?\n/);
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data:')) {
+              const jsonStr = trimmed.replace(/^data:\s*/, '').trim();
+              if (jsonStr) {
+                try {
+                  const parsed = JSON.parse(jsonStr);
+                  const candidate = parsed.candidates?.[0];
+                  const chunk = candidate?.content?.parts?.[0]?.text || '';
+                  if (chunk) {
+                    accumulatedText += chunk;
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                      mainWindow.webContents.send('quick-translate-chunk', accumulatedText);
+                    }
+                  }
+                  if (candidate?.finishReason) {
+                    isDone = true;
+                    break;
+                  }
+                } catch {}
+              }
+            }
+          }
+        }
+        try { reader.cancel(); } catch {}
+        if (accumulatedText && accumulatedText.trim()) return accumulatedText.trim();
       }
     }
   } catch (err) {
@@ -727,7 +951,7 @@ function triggerGlobalSelectionTranslation(explainJargon = false) {
           focusAppWindow(true);
 
           // 3. Immediately start streaming in Node.js concurrently with window paint (sub-200ms TTFT)
-          if (!explainJargon && savedAiProvider === 'gemini') {
+          if (!explainJargon) {
             const streamPromise = executeDirectNodeStream({ text: trimmed, targetLang: savedTargetLang });
             activeDirectStream = {
               text: trimmed,
@@ -765,21 +989,57 @@ function triggerGlobalSelectionTranslation(explainJargon = false) {
   }
 }
 
-async function runAiGeneration({ text, systemInstructionText, isJson = false, maxTokens = 1024, model, apiKey }) {
-  const isBYOM = savedAiProvider === 'corporate_gateway' || savedAiProvider === 'openai_compatible';
-  if (isBYOM) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+async function runAiGeneration({ text, systemInstructionText, isJson = false, maxTokens = 1024, model, apiKey, provider }) {
+  const cfg = resolveActiveProviderConfig({ provider, model, apiKey });
 
-    try {
-      const defaultEndpoint = savedAiProvider === 'corporate_gateway' ? 'https://oneapi.corp.internal/v1' : 'http://localhost:11434/v1';
-      const baseUrl = (savedCustomEndpoint || defaultEndpoint).replace(/\/+$/, '');
-      const endpoint = `${baseUrl}/chat/completions`;
-      const bearer = savedCustomApiKey ? `Bearer ${savedCustomApiKey.trim()}` : (savedAiProvider === 'corporate_gateway' ? '' : 'Bearer ollama');
+  if (cfg.provider !== 'openai_compatible' && !cfg.apiKey) {
+    throw new Error(`Please configure your API key for ${cfg.provider.toUpperCase()} in Settings ⚙️.`);
+  }
 
-      const defaultModel = savedAiProvider === 'corporate_gateway' ? 'gpt-4o' : 'llama3.2';
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    if (cfg.protocol === 'anthropic') {
+      const endpoint = `${cfg.endpoint}/messages`;
       const payload = {
-        model: savedCustomModel || model || defaultModel,
+        model: cfg.model,
+        system: systemInstructionText,
+        messages: [{ role: 'user', content: text }],
+        max_tokens: maxTokens,
+        temperature: 0.1
+      };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': cfg.apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        signal: controller.signal,
+        body: JSON.stringify(payload)
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error?.message || `Anthropic returned HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.content?.[0]?.text || '';
+    } else if (cfg.protocol === 'openai_compat') {
+      const endpoint = `${cfg.endpoint}/chat/completions`;
+      const headers = { 'Content-Type': 'application/json' };
+      if (cfg.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+      if (cfg.provider === 'openrouter') {
+        headers['HTTP-Referer'] = 'https://github.com/pkoryaka/nativelingo';
+        headers['X-Title'] = 'NativeLingo';
+      }
+
+      const payload = {
+        model: cfg.model,
         messages: [
           { role: 'system', content: systemInstructionText },
           { role: 'user', content: text }
@@ -788,9 +1048,6 @@ async function runAiGeneration({ text, systemInstructionText, isJson = false, ma
         max_tokens: maxTokens,
         ...(isJson ? { response_format: { type: 'json_object' } } : {})
       };
-
-      const headers = { 'Content-Type': 'application/json' };
-      if (bearer) headers['Authorization'] = bearer;
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -807,81 +1064,71 @@ async function runAiGeneration({ text, systemInstructionText, isJson = false, ma
 
       const data = await response.json();
       return data.choices?.[0]?.message?.content || '';
-    } catch (err) {
-      clearTimeout(timeoutId);
-      throw err;
-    }
-  } else {
-    // Google Gemini Provider with Multi-Model Auto-Fallback
-    const requestedModel = savedCustomGeminiModel || model || savedModel || 'gemini-flash-lite-latest';
-    const key = (apiKey && apiKey.trim()) || savedApiKey;
-    if (!key) {
-      throw new Error('Please configure your Google Gemini API Key.');
-    }
+    } else {
+      // Google Gemini with multi-model fallback
+      const candidates = Array.from(new Set([
+        cfg.model,
+        'gemini-flash-lite-latest'
+      ].filter(Boolean)));
 
-    const safeRequested = requestedModel;
-    const candidates = Array.from(new Set([
-      safeRequested,
-      'gemini-flash-lite-latest'
-    ].filter(Boolean)));
+      let lastError = null;
 
-    let lastError = null;
+      for (let i = 0; i < candidates.length; i++) {
+        const candidateModel = candidates[i];
+        const isLast = (i === candidates.length - 1);
+        const subController = new AbortController();
+        const subTimeout = setTimeout(() => subController.abort(), 10000);
 
-    for (let i = 0; i < candidates.length; i++) {
-      const candidateModel = candidates[i];
-      const isLast = (i === candidates.length - 1);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+        try {
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${candidateModel}:generateContent?key=${cfg.apiKey}`;
+          const payload = {
+            systemInstruction: { parts: [{ text: systemInstructionText }] },
+            contents: [{ role: 'user', parts: [{ text }] }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: maxTokens,
+              candidateCount: 1,
+              ...(isJson ? { responseMimeType: 'application/json' } : {})
+            }
+          };
 
-      try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${candidateModel}:generateContent?key=${key.trim()}`;
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: subController.signal,
+            body: JSON.stringify(payload)
+          });
+          clearTimeout(subTimeout);
 
-        const payload = {
-          systemInstruction: { parts: [{ text: systemInstructionText }] },
-          contents: [{ role: 'user', parts: [{ text }] }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: maxTokens,
-            candidateCount: 1,
-            ...(isJson ? { responseMimeType: 'application/json' } : {})
+          if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            const errMsg = err.error?.message || `HTTP ${response.status}`;
+            console.warn(`Model ${candidateModel} returned HTTP ${response.status} (${errMsg}).`);
+            lastError = new Error(errMsg);
+
+            if ((response.status === 429 || response.status === 503 || response.status === 404 || response.status === 400) && !isLast) {
+              console.warn(`Retrying with next Gemini fallback model...`);
+              continue;
+            }
+            throw lastError;
           }
-        };
 
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          signal: controller.signal,
-          body: JSON.stringify(payload)
-        });
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          const err = await response.json().catch(() => ({}));
-          const errMsg = err.error?.message || `HTTP ${response.status}`;
-          console.warn(`Model ${candidateModel} returned HTTP ${response.status} (${errMsg}).`);
-          lastError = new Error(errMsg);
-
-          if ((response.status === 429 || response.status === 503 || response.status === 404 || response.status === 400) && !isLast) {
-            console.warn(`Retrying with next Gemini fallback model...`);
+          const data = await response.json();
+          return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        } catch (err) {
+          clearTimeout(subTimeout);
+          lastError = err;
+          if (!isLast) {
+            console.warn(`Attempt with ${candidateModel} error: ${err.message}. Retrying fallback...`);
             continue;
           }
           throw lastError;
         }
-
-        const data = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      } catch (err) {
-        clearTimeout(timeoutId);
-        lastError = err;
-        if (!isLast) {
-          console.warn(`Attempt with ${candidateModel} error: ${err.message}. Retrying fallback...`);
-          continue;
-        }
-        throw lastError;
       }
+      throw lastError || new Error('All candidate Gemini models failed.');
     }
-
-    throw lastError || new Error('All candidate Gemini models failed.');
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -913,11 +1160,13 @@ function triggerQuickSlotAction(slotId) {
 
         if (slot.pasteBack) {
           // Direct In-Place Text Processing & Replacement
-          if (savedAiProvider === 'gemini' && (!savedApiKey || !savedApiKey.trim())) {
+          let cfg = resolveActiveProviderConfig();
+          if (cfg.provider !== 'openai_compatible' && !cfg.apiKey) {
             loadSavedConfig();
+            cfg = resolveActiveProviderConfig();
           }
 
-          if (savedAiProvider === 'gemini' && (!savedApiKey || !savedApiKey.trim())) {
+          if (cfg.provider !== 'openai_compatible' && !cfg.apiKey) {
             focusAppWindow(true);
             if (mainWindow) {
               mainWindow.webContents.send('open-settings');
@@ -928,12 +1177,8 @@ function triggerQuickSlotAction(slotId) {
           try {
             const systemInstructionText = `You are a precision text transformer. Follow this user instruction precisely: "${slot.prompt}". Keep the original language unless the instruction explicitly specifies a different language. Output ONLY the transformed text directly without conversational preamble, introduction, markdown commentary, or quotes.`;
 
-            // For in-place text replacement, prioritize ultra-low latency model
-            const fastModel = 'gemini-flash-lite-latest';
-
             const outputText = await runAiGeneration({
               text: trimmed,
-              model: fastModel,
               systemInstructionText,
               isJson: false,
               maxTokens: Math.max(128, Math.min(2048, trimmed.length * 4))
@@ -1097,6 +1342,13 @@ ipcMain.handle('clipboard:read', async () => {
   return clipboard.readText();
 });
 
+ipcMain.handle('shell:open-external', async (event, url) => {
+  if (url && typeof url === 'string') {
+    shell.openExternal(url);
+  }
+  return true;
+});
+
 ipcMain.handle('window:hide-to-tray', () => {
   if (mainWindow) {
     mainWindow.hide();
@@ -1162,6 +1414,10 @@ ipcMain.handle('enterprise:get-policy', async () => {
   };
 });
 
+ipcMain.handle('license:verify-key', async (event, key) => {
+  return verifyLicenseKey(key);
+});
+
 ipcMain.handle('hotkeys:get', async () => {
   return {
     translateHotkey,
@@ -1213,8 +1469,8 @@ ipcMain.handle('window:set-size', (event, { width, height }) => {
   return true;
 });
 
-// High-speed Native Translation Engine (Gemini Cloud OR Local BYOM)
-ipcMain.handle('native:translate', async (event, { apiKey, text, targetLang, customPrompt, explainJargon, model }) => {
+// High-speed Native Translation Engine (Gemini Cloud, Anthropic Claude, OpenAI, DeepSeek, Groq, OpenRouter, One API, Local LLM)
+ipcMain.handle('native:translate', async (event, { apiKey, text, targetLang, customPrompt, explainJargon, model, provider }) => {
   const isExplain = Boolean(explainJargon);
   const prompt = (customPrompt && customPrompt.trim()) ? customPrompt.trim() : '';
 
@@ -1238,164 +1494,203 @@ ipcMain.handle('native:translate', async (event, { apiKey, text, targetLang, cus
     ? `You are a precision text transformer. Follow this user instruction precisely: "${prompt}". Keep the original language unless the instruction explicitly specifies a different language. Output ONLY the transformed text directly without conversational preamble, introduction, markdown commentary, or quotes.`
     : `Translate into ${targetLang}. Output direct translation only without quotes, preamble, or commentary.`;
 
-  const isBYOM = savedAiProvider === 'corporate_gateway' || savedAiProvider === 'openai_compatible';
-  const key = isBYOM ? (savedCustomApiKey || apiKey || '') : ((apiKey && apiKey.trim()) || savedApiKey);
-  const targetModel = (savedAiProvider === 'gemini')
-    ? (savedCustomGeminiModel || model || savedModel || 'gemini-flash-lite-latest')
-    : (savedCustomModel || model || (savedAiProvider === 'corporate_gateway' ? 'gpt-4o' : 'llama3.2'));
+  const cfg = resolveActiveProviderConfig({ provider, model, apiKey });
 
-  // Ultra-fast streaming path in Node.js for One API / BYOM: bypasses Chromium renderer throttling
-  if (!isExplain && isBYOM) {
+  // Ultra-fast streaming path in Node.js (bypasses Chromium renderer throttling)
+  if (!isExplain && (cfg.provider === 'openai_compatible' || cfg.apiKey)) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 12000);
     let accumulatedText = '';
 
     try {
-      const defaultEndpoint = savedAiProvider === 'corporate_gateway' ? 'https://oneapi.corp.internal/v1' : 'http://localhost:11434/v1';
-      const baseUrl = (savedCustomEndpoint || defaultEndpoint).replace(/\/+$/, '');
-      const endpoint = `${baseUrl}/chat/completions`;
-      const bearer = savedCustomApiKey ? `Bearer ${savedCustomApiKey.trim()}` : (savedAiProvider === 'corporate_gateway' ? '' : 'Bearer ollama');
+      if (cfg.protocol === 'anthropic') {
+        const endpoint = `${cfg.endpoint}/messages`;
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': cfg.apiKey,
+            'anthropic-version': '2023-06-01'
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            model: cfg.model,
+            system: systemInstructionText,
+            messages: [{ role: 'user', content: text }],
+            stream: true,
+            max_tokens: Math.max(128, Math.min(1024, text.length * 3)),
+            temperature: 0.0
+          })
+        });
+        clearTimeout(timeoutId);
 
-      const headers = { 'Content-Type': 'application/json' };
-      if (bearer) headers['Authorization'] = bearer;
+        if (response.ok && response.body) {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buffer = '';
+          let isDone = false;
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        signal: controller.signal,
-        body: JSON.stringify({
-          model: targetModel,
-          messages: [
-            { role: 'system', content: systemInstructionText },
-            { role: 'user', content: text }
-          ],
-          temperature: 0.1,
-          stream: true,
-          max_tokens: Math.max(128, Math.min(1024, text.length * 3))
-        })
-      });
-      clearTimeout(timeoutId);
+          while (!isDone) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-      if (response.ok && response.body) {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-        let buffer = '';
-        let isDone = false;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split(/\r?\n/);
+            buffer = lines.pop() || '';
 
-        while (!isDone) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split(/\r?\n/);
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('data:')) {
-              const jsonStr = trimmed.replace(/^data:\s*/, '').trim();
-              if (jsonStr === '[DONE]') {
-                isDone = true;
-                break;
-              }
-              if (jsonStr) {
-                try {
-                  const parsed = JSON.parse(jsonStr);
-                  const chunk = parsed.choices?.[0]?.delta?.content || '';
-                  if (chunk) {
-                    accumulatedText += chunk;
-                    event.sender.send('quick-translate-chunk', accumulatedText);
-                  }
-                  if (parsed.choices?.[0]?.finish_reason) {
-                    isDone = true;
-                    break;
-                  }
-                } catch {}
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith('data:')) {
+                const jsonStr = trimmed.replace(/^data:\s*/, '').trim();
+                if (jsonStr) {
+                  try {
+                    const parsed = JSON.parse(jsonStr);
+                    if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+                      accumulatedText += parsed.delta.text;
+                      event.sender.send('quick-translate-chunk', accumulatedText);
+                    } else if (parsed.type === 'message_stop' || (parsed.type === 'message_delta' && parsed.delta?.stop_reason)) {
+                      isDone = true;
+                      break;
+                    }
+                  } catch {}
+                }
               }
             }
           }
-        }
-        try { reader.cancel(); } catch {}
-
-        if (accumulatedText && accumulatedText.trim()) {
-          return { success: true, rawOutput: accumulatedText.trim() };
-        }
-      }
-    } catch (streamErr) {
-      console.warn('One API / BYOM streaming notice, checking accumulated buffer:', streamErr.message);
-      if (accumulatedText && accumulatedText.trim()) {
-        return { success: true, rawOutput: accumulatedText.trim() };
-      }
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }
-
-  // Ultra-fast streaming path in Node.js for Google Gemini: bypasses Chromium renderer throttling
-  if (!isExplain && savedAiProvider === 'gemini' && key) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
-    let accumulatedText = '';
-
-    try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:streamGenerateContent?alt=sse&key=${key.trim()}`;
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemInstructionText }] },
-          contents: [{ role: 'user', parts: [{ text }] }],
-          generationConfig: {
-            temperature: 0.0,
-            maxOutputTokens: Math.max(128, Math.min(1024, text.length * 3)),
-            candidateCount: 1
+          try { reader.cancel(); } catch {}
+          if (accumulatedText && accumulatedText.trim()) {
+            return { success: true, rawOutput: accumulatedText.trim() };
           }
-        })
-      });
-      clearTimeout(timeoutId);
+        }
+      } else if (cfg.protocol === 'openai_compat') {
+        const endpoint = `${cfg.endpoint}/chat/completions`;
+        const headers = { 'Content-Type': 'application/json' };
+        if (cfg.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+        if (cfg.provider === 'openrouter') {
+          headers['HTTP-Referer'] = 'https://github.com/pkoryaka/nativelingo';
+          headers['X-Title'] = 'NativeLingo';
+        }
 
-      if (response.ok && response.body) {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-        let buffer = '';
-        let isDone = false;
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          signal: controller.signal,
+          body: JSON.stringify({
+            model: cfg.model,
+            messages: [
+              { role: 'system', content: systemInstructionText },
+              { role: 'user', content: text }
+            ],
+            temperature: 0.1,
+            stream: true,
+            max_tokens: Math.max(128, Math.min(1024, text.length * 3))
+          })
+        });
+        clearTimeout(timeoutId);
 
-        while (!isDone) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        if (response.ok && response.body) {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buffer = '';
+          let isDone = false;
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split(/\r?\n/);
-          buffer = lines.pop() || '';
+          while (!isDone) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('data:')) {
-              const jsonStr = trimmed.replace(/^data:\s*/, '').trim();
-              if (jsonStr) {
-                try {
-                  const parsed = JSON.parse(jsonStr);
-                  const candidate = parsed.candidates?.[0];
-                  const chunk = candidate?.content?.parts?.[0]?.text || '';
-                  if (chunk) {
-                    accumulatedText += chunk;
-                    event.sender.send('quick-translate-chunk', accumulatedText);
-                  }
-                  if (candidate?.finishReason) {
-                    isDone = true;
-                    break;
-                  }
-                } catch {}
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split(/\r?\n/);
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith('data:')) {
+                const jsonStr = trimmed.replace(/^data:\s*/, '').trim();
+                if (jsonStr === '[DONE]') {
+                  isDone = true;
+                  break;
+                }
+                if (jsonStr) {
+                  try {
+                    const parsed = JSON.parse(jsonStr);
+                    const chunk = parsed.choices?.[0]?.delta?.content || '';
+                    if (chunk) {
+                      accumulatedText += chunk;
+                      event.sender.send('quick-translate-chunk', accumulatedText);
+                    }
+                    if (parsed.choices?.[0]?.finish_reason) {
+                      isDone = true;
+                      break;
+                    }
+                  } catch {}
+                }
               }
             }
           }
+          try { reader.cancel(); } catch {}
+          if (accumulatedText && accumulatedText.trim()) {
+            return { success: true, rawOutput: accumulatedText.trim() };
+          }
         }
-        try { reader.cancel(); } catch {}
+      } else {
+        // Google Gemini
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model}:streamGenerateContent?alt=sse&key=${cfg.apiKey}`;
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemInstructionText }] },
+            contents: [{ role: 'user', parts: [{ text }] }],
+            generationConfig: {
+              temperature: 0.0,
+              maxOutputTokens: Math.max(128, Math.min(1024, text.length * 3)),
+              candidateCount: 1
+            }
+          })
+        });
+        clearTimeout(timeoutId);
 
-        if (accumulatedText && accumulatedText.trim()) {
-          return { success: true, rawOutput: accumulatedText.trim() };
+        if (response.ok && response.body) {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buffer = '';
+          let isDone = false;
+
+          while (!isDone) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split(/\r?\n/);
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith('data:')) {
+                const jsonStr = trimmed.replace(/^data:\s*/, '').trim();
+                if (jsonStr) {
+                  try {
+                    const parsed = JSON.parse(jsonStr);
+                    const candidate = parsed.candidates?.[0];
+                    const chunk = candidate?.content?.parts?.[0]?.text || '';
+                    if (chunk) {
+                      accumulatedText += chunk;
+                      event.sender.send('quick-translate-chunk', accumulatedText);
+                    }
+                    if (candidate?.finishReason) {
+                      isDone = true;
+                      break;
+                    }
+                  } catch {}
+                }
+              }
+            }
+          }
+          try { reader.cancel(); } catch {}
+          if (accumulatedText && accumulatedText.trim()) {
+            return { success: true, rawOutput: accumulatedText.trim() };
+          }
         }
       }
     } catch (streamErr) {
@@ -1415,8 +1710,9 @@ ipcMain.handle('native:translate', async (event, { apiKey, text, targetLang, cus
     systemInstructionText,
     isJson: isExplain,
     maxTokens,
-    model: targetModel,
-    apiKey: key
+    model: cfg.model,
+    apiKey: cfg.apiKey,
+    provider: cfg.provider
   });
 
   return { success: true, rawOutput };
@@ -1436,42 +1732,96 @@ ipcMain.handle('models:fetch', async (event, apiKey) => {
   return await response.json();
 });
 
-ipcMain.handle('endpoint:test', async (event, { endpoint, model, apiKey }) => {
-  const defaultUrl = (endpoint && !endpoint.includes('localhost')) ? endpoint : (endpoint || 'http://localhost:11434/v1');
-  const url = `${defaultUrl.replace(/\/+$/, '')}/chat/completions`;
+ipcMain.handle('endpoint:test', async (event, { endpoint, model, apiKey, provider }) => {
+  const cfg = resolveActiveProviderConfig({ provider, endpoint, model, apiKey });
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const timeoutId = setTimeout(() => controller.abort(), 9000);
   const startTime = Date.now();
 
   try {
-    const headers = {
-      'Content-Type': 'application/json'
-    };
-    if (apiKey && apiKey.trim()) {
-      headers['Authorization'] = `Bearer ${apiKey.trim()}`;
-    }
+    if (cfg.protocol === 'anthropic' || cfg.endpoint.includes('anthropic.com')) {
+      const url = `${cfg.endpoint}/messages`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': cfg.apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: cfg.model || 'claude-3-5-haiku-latest',
+          messages: [{ role: 'user', content: 'Say OK' }],
+          max_tokens: 10
+        })
+      });
+      clearTimeout(timeoutId);
+      const latency = Date.now() - startTime;
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: model || 'llama3.2',
-        messages: [{ role: 'user', content: 'Say OK' }],
-        max_tokens: 10
-      })
-    });
-    clearTimeout(timeoutId);
-    const latency = Date.now() - startTime;
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        const msg = err.error?.message || `HTTP ${response.status} ${response.statusText}`;
+        return { success: false, text: `Anthropic error (${response.status}): ${msg}` };
+      }
+      const data = await response.json();
+      const reply = data.content?.[0]?.text?.trim() || 'OK';
+      return { success: true, text: `✓ Connected (${latency}ms) — Model "${cfg.model}" verified: "${reply}"` };
+    } else if (cfg.protocol === 'gemini' || cfg.endpoint.includes('generativelanguage')) {
+      const targetModel = cfg.model || 'gemini-flash-lite-latest';
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${cfg.apiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: 'OK' }] }]
+        })
+      });
+      clearTimeout(timeoutId);
+      const latency = Date.now() - startTime;
 
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      const msg = err.error?.message || `HTTP ${response.status} ${response.statusText}`;
-      return { success: false, text: `Gateway error (${response.status}): ${msg}` };
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        const msg = err.error?.message || `HTTP ${response.status} ${response.statusText}`;
+        return { success: false, text: `Gemini error (${response.status}): ${msg}` };
+      }
+      const data = await response.json();
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'OK';
+      return { success: true, text: `✓ Connected (${latency}ms) — Model "${targetModel}" verified: "${reply}"` };
+    } else {
+      // OpenAI-compatible (OpenAI, DeepSeek, Groq, OpenRouter, One API, Local LLM)
+      const url = `${cfg.endpoint}/chat/completions`;
+      const headers = { 'Content-Type': 'application/json' };
+      if (cfg.apiKey) {
+        headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+      }
+      if (cfg.provider === 'openrouter') {
+        headers['HTTP-Referer'] = 'https://github.com/pkoryaka/nativelingo';
+        headers['X-Title'] = 'NativeLingo';
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: cfg.model || 'gpt-4o-mini',
+          messages: [{ role: 'user', content: 'Say OK' }],
+          max_tokens: 10
+        })
+      });
+      clearTimeout(timeoutId);
+      const latency = Date.now() - startTime;
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        const msg = err.error?.message || `HTTP ${response.status} ${response.statusText}`;
+        return { success: false, text: `Gateway error (${response.status}): ${msg}` };
+      }
+      const data = await response.json();
+      const reply = data.choices?.[0]?.message?.content?.trim() || 'OK';
+      return { success: true, text: `✓ Connected (${latency}ms) — Model "${cfg.model}" verified: "${reply}"` };
     }
-    const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content?.trim() || 'OK';
-    return { success: true, text: `✓ Connected (${latency}ms) — Model "${model || 'default'}" verified: "${reply}"` };
   } catch (err) {
     clearTimeout(timeoutId);
     return { success: false, text: `Connection failed: ${err.message}` };

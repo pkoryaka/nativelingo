@@ -4,10 +4,10 @@ import {
   Monitor, RotateCw, Power, Keyboard, Zap, BookOpen, Languages, 
   AppWindow, Cpu, Server, Sun, Moon, Palette, Sliders, History,
   Star, Search, Check, Volume2, VolumeX, CreditCard, BadgeCheck, ShieldAlert, Award,
-  Building2, Lock, Clock
+  Building2, Lock, Clock, Bot, Globe, ChevronDown, ChevronUp, ShieldCheck, Copy, Mail
 } from 'lucide-react';
 import { AVAILABLE_MODELS, SUPPORTED_LANGUAGES, testGeminiApiKey, fetchLiveAvailableModels } from '../services/geminiService';
-import { storageService, ROLE_PRESET_PACKS } from '../services/storageService';
+import { storageService, ROLE_PRESET_PACKS, AI_PROVIDERS } from '../services/storageService';
 import { licenseService } from '../services/licenseService';
 import { ttsService } from '../services/ttsService';
 import { HotkeyRecorder } from './HotkeyRecorder';
@@ -50,13 +50,39 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
   const [startMinimized, setStartMinimized] = useState(currentSettings.startMinimized || false);
   const [saveHistory, setSaveHistory] = useState(currentSettings.saveHistory !== false);
 
-  // BYOM (Bring Your Own Model) state
+  // BYOM & Multi-Provider state
   const [aiProvider, setAiProvider] = useState(currentSettings.aiProvider || 'gemini');
   const [customGeminiModel, setCustomGeminiModel] = useState(currentSettings.customGeminiModel || '');
   const [customEndpoint, setCustomEndpoint] = useState(currentSettings.customEndpoint || 'http://localhost:11434/v1');
-  const [customApiKey, setCustomApiKey] = useState(currentSettings.customApiKey || '');
+  const [customApiKey, setCustomApiKey] = useState(() => storageService.getProviderApiKey(currentSettings.aiProvider || 'gemini'));
   const [customModel, setCustomModel] = useState(currentSettings.customModel || 'llama3.2');
   const [endpointTestStatus, setEndpointTestStatus] = useState(null);
+  const [showAdvancedEndpoint, setShowAdvancedEndpoint] = useState(false);
+
+  const handleSelectProvider = (provId) => {
+    if (isLocked) return;
+    const prov = AI_PROVIDERS.find((p) => p.id === provId);
+    if (!prov) return;
+
+    if (aiProvider === 'gemini') {
+      storageService.setApiKey(apiKey);
+    } else {
+      storageService.setProviderApiKey(aiProvider, customApiKey);
+    }
+
+    setAiProvider(provId);
+    setTestStatus(null);
+    setEndpointTestStatus(null);
+
+    if (provId === 'gemini') {
+      // Keep Gemini state
+    } else {
+      const savedKey = storageService.getProviderApiKey(provId);
+      setCustomApiKey(savedKey);
+      setCustomEndpoint(prov.endpoint);
+      setCustomModel(prov.defaultModel);
+    }
+  };
 
   // Primary Target Language & Preferred Languages
   const [primaryTargetLanguage, setPrimaryTargetLanguage] = useState(currentSettings.primaryTargetLanguage || 'uk');
@@ -195,43 +221,70 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
   };
 
   const handleTestCustomEndpoint = async () => {
-    const ep = customEndpoint || (aiProvider === 'corporate_gateway' ? 'https://oneapi.corp.internal/v1' : 'http://localhost:11434/v1');
-    setEndpointTestStatus({ loading: true, message: `Connecting to ${ep}...` });
+    const provMeta = AI_PROVIDERS.find((p) => p.id === aiProvider) || AI_PROVIDERS[0];
+    const ep = customEndpoint || provMeta.endpoint;
+    const keyToTest = (aiProvider === 'gemini') ? apiKey : (customApiKey || storageService.getProviderApiKey(aiProvider));
+    const modelToTest = (aiProvider === 'gemini') ? (customGeminiModel || model) : (customModel || provMeta.defaultModel);
+
+    setEndpointTestStatus({ loading: true, message: `Connecting to ${provMeta.name}...` });
     try {
       if (window.electronAPI?.testEndpoint) {
         const res = await window.electronAPI.testEndpoint({
           endpoint: ep,
-          model: customModel,
-          apiKey: customApiKey
+          model: modelToTest,
+          apiKey: keyToTest,
+          provider: aiProvider
         });
         if (res.success) {
-          setEndpointTestStatus({ success: true, message: res.text || `✓ Connected to ${customModel || 'model'} successfully!` });
+          setEndpointTestStatus({ success: true, message: res.text || `✓ Connected to ${modelToTest} successfully!` });
         } else {
           setEndpointTestStatus({ success: false, message: res.text || 'Connection test failed.' });
         }
       } else {
-        const url = `${ep.replace(/\/+$/, '')}/chat/completions`;
-        const headers = { 'Content-Type': 'application/json' };
-        if (customApiKey && customApiKey.trim()) {
-          headers['Authorization'] = `Bearer ${customApiKey.trim()}`;
+        if (aiProvider === 'anthropic') {
+          const url = `${ep.replace(/\/+$/, '')}/messages`;
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': keyToTest,
+              'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+              model: modelToTest,
+              messages: [{ role: 'user', content: 'Say OK' }],
+              max_tokens: 10
+            })
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error?.message || `HTTP ${res.status}`);
+          }
+          setEndpointTestStatus({ success: true, message: `✓ Connected to ${modelToTest} successfully!` });
+        } else {
+          const url = `${ep.replace(/\/+$/, '')}/chat/completions`;
+          const headers = { 'Content-Type': 'application/json' };
+          if (keyToTest && keyToTest.trim()) {
+            headers['Authorization'] = `Bearer ${keyToTest.trim()}`;
+          }
+          const res = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              model: modelToTest,
+              messages: [{ role: 'user', content: 'Say OK' }],
+              max_tokens: 10
+            })
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error?.message || `HTTP ${res.status}`);
+          }
+          setEndpointTestStatus({ success: true, message: `✓ Connected to ${modelToTest} successfully!` });
         }
-        const res = await fetch(url, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            model: customModel || (aiProvider === 'corporate_gateway' ? 'gpt-4o' : 'llama3.2'),
-            messages: [{ role: 'user', content: 'Say OK' }],
-            max_tokens: 10
-          })
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error?.message || `HTTP ${res.status}`);
-        }
-        setEndpointTestStatus({ success: true, message: `✓ Connected to ${customModel || 'model'} successfully!` });
       }
     } catch (err) {
-      setEndpointTestStatus({ success: false, message: err.message || 'Connection to custom endpoint failed.' });
+      setEndpointTestStatus({ success: false, message: err.message || 'Connection test failed.' });
     }
   };
 
@@ -316,6 +369,95 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
     if (onSettingsUpdated) onSettingsUpdated();
   };
 
+  const [selectedTier, setSelectedTier] = useState(null);
+  const [copiedOrder, setCopiedOrder] = useState(false);
+
+  const handleSelectTier = (tierKey) => {
+    setSelectedTier((prev) => (prev === tierKey ? null : tierKey));
+    setCopiedOrder(false);
+  };
+
+  const handleInstantDemoActivate = async (tierKey) => {
+    setIsActivating(true);
+    setActivationMsg(null);
+    let key = '';
+    if (tierKey === 'annual') {
+      key = 'NL-PRO-ANNUAL-EVAL-2026';
+    } else if (tierKey === 'perpetual') {
+      key = 'NL-PERP-LIFETIME-EVAL-2026';
+    } else {
+      key = 'NL-TEAM-CORP-EVAL-2026';
+    }
+    setInputLicenseKey(key);
+    const res = await licenseService.activateLicense(key);
+    setIsActivating(false);
+    if (res.success) {
+      setLicenseState(licenseService.getLicenseState());
+      setActivationMsg({ success: true, text: res.message });
+      setSelectedTier(null);
+      if (onSettingsUpdated) onSettingsUpdated();
+    } else {
+      setActivationMsg({ success: false, text: res.error });
+    }
+  };
+
+  const handleCopyOrderDetails = (tierKey) => {
+    let details = '';
+    if (tierKey === 'annual') {
+      details = `NativeLingo Commercial License Order Request:
+- Plan: Commercial Single-User Annual ($17 / year)
+- Workstations: 2 PCs included
+- Updates & Priority Support: Included
+- Contact / Send to: licensing@businessintel.co.site
+- Please send invoice & payment instructions.`;
+    } else if (tierKey === 'perpetual') {
+      details = `NativeLingo Commercial License Order Request:
+- Plan: Commercial Single-User Perpetual ($29 one-time launch deal)
+- Workstations: 2 PCs included
+- 12 Months Version Updates & Perpetual Right: Included
+- Contact / Send to: licensing@businessintel.co.site
+- Please send invoice & payment instructions.`;
+    } else {
+      details = `NativeLingo Commercial License Order Request:
+- Plan: Commercial Multi-User Team ($24 / seat / year)
+- Seats: 3 Seats Minimum ($72 / year)
+- Cryptographic Offline Keys & Central Management: Included
+- Contact / Send to: licensing@businessintel.co.site
+- Please send corporate tax invoice & wire/ACH instructions.`;
+    }
+
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(details);
+    } else if (window.electronAPI?.copyToClipboard) {
+      window.electronAPI.copyToClipboard(details);
+    }
+    setCopiedOrder(true);
+    setTimeout(() => setCopiedOrder(false), 2500);
+  };
+
+  const handleEmailOrder = (tierKey) => {
+    const title = tierKey === 'annual' 
+      ? 'Single-User Annual ($17/yr)' 
+      : (tierKey === 'perpetual' ? 'Single-User Perpetual ($29)' : 'Multi-User Team ($24/seat/yr)');
+    const subject = encodeURIComponent(`NativeLingo License Order - ${title}`);
+    const body = encodeURIComponent(`Hello NativeLingo Licensing Team,
+
+I would like to order a ${title}.
+
+Organization / Company Name: 
+License Contact Email: 
+Number of Seats / Workstations: 
+Preferred Payment Method: Credit Card / Corporate Invoice / Wire
+
+Thank you!`);
+    const mailUrl = `mailto:licensing@businessintel.co.site?subject=${subject}&body=${body}`;
+    if (window.electronAPI?.openExternal) {
+      window.electronAPI.openExternal(mailUrl);
+    } else {
+      window.open(mailUrl, '_blank');
+    }
+  };
+
   const handleSave = () => {
     if (hasConflict) return;
 
@@ -323,6 +465,9 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
     setIsTestingTts(false);
 
     storageService.setApiKey(apiKey.trim());
+    if (aiProvider !== 'gemini') {
+      storageService.setProviderApiKey(aiProvider, customApiKey);
+    }
     storageService.saveSettings({
       ...currentSettings,
       model,
@@ -390,6 +535,23 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
   const otherLanguages = useMemo(() => {
     return filteredLanguages.filter((l) => !preferredLanguages.includes(l.code));
   }, [filteredLanguages, preferredLanguages]);
+
+  const selectedProviderMeta = useMemo(() => {
+    return AI_PROVIDERS.find((p) => p.id === aiProvider) || AI_PROVIDERS[0];
+  }, [aiProvider]);
+
+  const renderProviderIcon = (iconName, color = 'var(--primary)', size = 15) => {
+    switch (iconName) {
+      case 'Sparkles': return <Sparkles size={size} color={color} />;
+      case 'Bot': return <Bot size={size} color={color} />;
+      case 'Zap': return <Zap size={size} color={color} />;
+      case 'Cpu': return <Cpu size={size} color={color} />;
+      case 'Globe': return <Globe size={size} color={color} />;
+      case 'Building2': return <Building2 size={size} color={color} />;
+      case 'Server': return <Server size={size} color={color} />;
+      default: return <Cpu size={size} color={color} />;
+    }
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -563,139 +725,97 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                     </span>
                   </div>
 
-                  {/* Provider Switch Tabs */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                    <button
-                      type="button"
-                      disabled={isLocked}
-                      onClick={() => setAiProvider('gemini')}
-                      style={{
-                        padding: '9px 10px',
-                        borderRadius: 'var(--radius-sm)',
-                        border: aiProvider === 'gemini' ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
-                        background: aiProvider === 'gemini' ? 'rgba(99, 102, 241, 0.18)' : 'var(--bg-input)',
-                        color: aiProvider === 'gemini' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        fontWeight: 600,
-                        fontSize: '0.78rem',
-                        cursor: isLocked ? 'not-allowed' : 'pointer',
-                        opacity: isLocked && aiProvider !== 'gemini' ? 0.5 : 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      <Sparkles size={14} color={aiProvider === 'gemini' ? 'var(--primary)' : 'var(--text-muted)'} />
-                      <span>Google Gemini</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={isLocked}
-                      onClick={() => {
-                        setAiProvider('corporate_gateway');
-                        if (!customEndpoint || customEndpoint.includes('localhost')) {
-                          setCustomEndpoint('https://oneapi.corp.internal/v1');
-                          setCustomModel('gpt-4o');
-                        }
-                      }}
-                      style={{
-                        padding: '9px 10px',
-                        borderRadius: 'var(--radius-sm)',
-                        border: aiProvider === 'corporate_gateway' ? '1.5px solid #8b5cf6' : '1px solid var(--border-color)',
-                        background: aiProvider === 'corporate_gateway' ? 'rgba(139, 92, 246, 0.18)' : 'var(--bg-input)',
-                        color: aiProvider === 'corporate_gateway' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        fontWeight: 600,
-                        fontSize: '0.78rem',
-                        cursor: isLocked ? 'not-allowed' : 'pointer',
-                        opacity: isLocked && aiProvider !== 'corporate_gateway' ? 0.5 : 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      <Building2 size={14} color={aiProvider === 'corporate_gateway' ? '#a78bfa' : 'var(--text-muted)'} />
-                      <span>Corporate One API</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={isLocked}
-                      onClick={() => {
-                        setAiProvider('openai_compatible');
-                        if (!customEndpoint || customEndpoint.includes('oneapi.corp')) {
-                          setCustomEndpoint('http://localhost:11434/v1');
-                          setCustomModel('llama3.2');
-                        }
-                      }}
-                      style={{
-                        padding: '9px 10px',
-                        borderRadius: 'var(--radius-sm)',
-                        border: aiProvider === 'openai_compatible' ? '1.5px solid var(--accent-emerald)' : '1px solid var(--border-color)',
-                        background: aiProvider === 'openai_compatible' ? 'rgba(16, 185, 129, 0.18)' : 'var(--bg-input)',
-                        color: aiProvider === 'openai_compatible' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        fontWeight: 600,
-                        fontSize: '0.78rem',
-                        cursor: isLocked ? 'not-allowed' : 'pointer',
-                        opacity: isLocked && aiProvider !== 'openai_compatible' ? 0.5 : 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      <Server size={14} color={aiProvider === 'openai_compatible' ? 'var(--accent-emerald)' : 'var(--text-muted)'} />
-                      <span>Local LLM</span>
-                    </button>
+                  {/* Multi-Provider Selector Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px' }}>
+                    {AI_PROVIDERS.map((prov) => {
+                      const isSelected = aiProvider === prov.id;
+                      return (
+                        <button
+                          key={prov.id}
+                          type="button"
+                          disabled={isLocked}
+                          onClick={() => handleSelectProvider(prov.id)}
+                          style={{
+                            padding: '10px 10px',
+                            borderRadius: 'var(--radius-sm)',
+                            border: isSelected ? `2px solid ${prov.badgeColor}` : '1px solid var(--border-color)',
+                            background: isSelected ? `${prov.badgeColor}22` : 'var(--bg-input)',
+                            color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
+                            fontWeight: 600,
+                            fontSize: '0.78rem',
+                            cursor: isLocked ? 'not-allowed' : 'pointer',
+                            opacity: isLocked && !isSelected ? 0.5 : 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'flex-start',
+                            gap: '4px',
+                            textAlign: 'left',
+                            transition: 'all 0.2s ease',
+                            boxShadow: isSelected ? `0 0 12px ${prov.badgeColor}33` : 'none'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {renderProviderIcon(prov.iconName, isSelected ? prov.badgeColor : 'var(--text-muted)', 15)}
+                              <span style={{ fontWeight: 700, fontSize: '0.78rem' }}>{prov.name}</span>
+                            </div>
+                            {isSelected && (
+                              <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: prov.badgeColor }} />
+                            )}
+                          </div>
+                          <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', lineHeight: '1.2' }}>
+                            {prov.tagline}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  {/* Transparent Data Routing & Privacy Notice */}
+                  {/* Transparent Data Routing & Security Banner */}
                   <div style={{
                     display: 'flex',
                     alignItems: 'flex-start',
                     gap: '10px',
-                    background: aiProvider === 'gemini' 
-                      ? 'rgba(99, 102, 241, 0.08)' 
-                      : (aiProvider === 'corporate_gateway' ? 'rgba(139, 92, 246, 0.08)' : 'rgba(16, 185, 129, 0.08)'),
-                    border: `1px solid ${
-                      aiProvider === 'gemini' 
-                        ? 'rgba(99, 102, 241, 0.25)' 
-                        : (aiProvider === 'corporate_gateway' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(16, 185, 129, 0.25)')
-                    }`,
+                    background: `${selectedProviderMeta.badgeColor}12`,
+                    border: `1px solid ${selectedProviderMeta.badgeColor}40`,
                     borderRadius: 'var(--radius-sm)',
                     padding: '10px 12px',
                     fontSize: '0.75rem',
                     lineHeight: '1.4'
                   }}>
                     <div style={{ flexShrink: 0, marginTop: '2px' }}>
-                      {aiProvider === 'gemini' && <Sparkles size={16} color="var(--primary)" />}
-                      {aiProvider === 'corporate_gateway' && <Building2 size={16} color="#8b5cf6" />}
-                      {aiProvider === 'openai_compatible' && <CheckCircle2 size={16} color="#10b981" />}
+                      {renderProviderIcon(selectedProviderMeta.iconName, selectedProviderMeta.badgeColor, 16)}
                     </div>
                     <div>
                       <strong style={{ color: 'var(--text-primary)', display: 'block', marginBottom: '2px' }}>
                         {aiProvider === 'gemini' && '☁️ Direct Cloud Routing (Google AI Studio)'}
+                        {aiProvider === 'openai' && '🟢 Direct Cloud Routing (OpenAI Platform)'}
+                        {aiProvider === 'anthropic' && '⚡ Direct Claude API Routing (Anthropic)'}
+                        {aiProvider === 'deepseek' && '🔵 Direct DeepSeek API Routing'}
+                        {aiProvider === 'groq' && '⚡ Ultra-Fast LPU Routing (Groq)'}
+                        {aiProvider === 'openrouter' && '🌐 Universal Model Aggregator (OpenRouter)'}
                         {aiProvider === 'corporate_gateway' && '🏢 Central Corporate AI Gateway / One API Routing'}
                         {aiProvider === 'openai_compatible' && '🛡️ 100% Private Local Offline Routing'}
                       </strong>
                       <span style={{ color: 'var(--text-secondary)' }}>
                         {aiProvider === 'gemini' && 'Text is sent over encrypted TLS directly to Google Gemini using your personal API key. Zero intermediate servers touch your text.'}
+                        {aiProvider === 'openai' && 'Text is sent over encrypted TLS directly to OpenAI (api.openai.com/v1) using your personal OpenAI API key. Zero intermediate servers.'}
+                        {aiProvider === 'anthropic' && 'Text is sent over encrypted TLS directly to Anthropic (api.anthropic.com/v1) using your personal Claude API key. Zero intermediate servers.'}
+                        {aiProvider === 'deepseek' && 'Text is sent over encrypted TLS directly to DeepSeek (api.deepseek.com/v1) using your DeepSeek API key.'}
+                        {aiProvider === 'groq' && 'Text is sent over encrypted TLS directly to Groq LPUs (api.groq.com/openai/v1) for sub-100ms ultra-low latency translations.'}
+                        {aiProvider === 'openrouter' && 'Text is sent directly to OpenRouter (openrouter.ai/api/v1) using your OpenRouter token with access to 200+ models.'}
                         {aiProvider === 'corporate_gateway' && `Text is routed directly with your corporate bearer token to your organization's centralized One API or LiteLLM gateway (${customEndpoint || 'custom URL'}). Complies with corporate DLP policies.`}
                         {aiProvider === 'openai_compatible' && `Text is sent directly to your local endpoint (${customEndpoint || 'localhost'}). All computation stays 100% on your physical machine with zero internet transmission.`}
                       </span>
                     </div>
                   </div>
 
-                  {/* Gemini Cloud Section */}
-                  {aiProvider === 'gemini' && (
+                  {/* Provider Specific Configuration */}
+                  {aiProvider === 'gemini' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
                       <div className="form-group">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <label className="form-label" htmlFor="api-key-input">Gemini API Key</label>
+                          <label className="form-label" htmlFor="api-key-input">Google Gemini API Key</label>
                           <a
                             href="https://aistudio.google.com/app/apikey"
                             target="_blank"
@@ -713,7 +833,10 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                             placeholder={isLocked && enterprisePolicy.hasApiKey ? '•••••••••••••••• (Managed by Corporate IT Policy)' : 'AIzaSy...'}
                             disabled={isLocked}
                             value={apiKey}
-                            onChange={(e) => setApiKey(e.target.value)}
+                            onChange={(e) => {
+                              setApiKey(e.target.value);
+                              storageService.setApiKey(e.target.value);
+                            }}
                             style={{ paddingRight: '70px', fontFamily: 'var(--font-mono)', opacity: isLocked ? 0.75 : 1, cursor: isLocked ? 'not-allowed' : 'text' }}
                           />
                           <button
@@ -825,218 +948,279 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                         )}
                       </div>
                     </div>
-                  )}
-
-                  {/* Corporate One API Section */}
-                  {aiProvider === 'corporate_gateway' && (
+                  ) : (
+                    /* Managed Cloud, Corporate One API, and Local LLM Configuration */
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCustomEndpoint('https://oneapi.corp.internal/v1');
-                            setCustomModel('gpt-4o');
-                          }}
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: '4px',
-                            border: '1px solid rgba(139, 92, 246, 0.3)',
-                            background: 'rgba(139, 92, 246, 0.1)',
-                            color: '#a78bfa',
-                            fontSize: '0.72rem',
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Preset: One API Gateway
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCustomEndpoint('https://litellm.corp.internal/v1');
-                            setCustomModel('claude-3-5-sonnet');
-                          }}
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: '4px',
-                            border: '1px solid rgba(6, 182, 212, 0.3)',
-                            background: 'rgba(6, 182, 212, 0.1)',
-                            color: 'var(--accent-cyan)',
-                            fontSize: '0.72rem',
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Preset: LiteLLM Proxy
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCustomEndpoint('https://ai-proxy.your-company.com/v1');
-                            setCustomModel('gemini-1.5-flash');
-                          }}
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: '4px',
-                            border: '1px solid rgba(16, 185, 129, 0.3)',
-                            background: 'rgba(16, 185, 129, 0.1)',
-                            color: 'var(--accent-emerald)',
-                            fontSize: '0.72rem',
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Preset: Internal Corp Proxy
-                        </button>
+                      {/* Presets (for Corporate and Local) */}
+                      {aiProvider === 'corporate_gateway' && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomEndpoint('https://oneapi.corp.internal/v1');
+                              setCustomModel('gpt-4o');
+                            }}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              border: '1px solid rgba(139, 92, 246, 0.3)',
+                              background: 'rgba(139, 92, 246, 0.1)',
+                              color: '#a78bfa',
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Preset: One API Gateway
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomEndpoint('https://litellm.corp.internal/v1');
+                              setCustomModel('claude-3-5-sonnet');
+                            }}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              border: '1px solid rgba(6, 182, 212, 0.3)',
+                              background: 'rgba(6, 182, 212, 0.1)',
+                              color: 'var(--accent-cyan)',
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Preset: LiteLLM Proxy
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomEndpoint('https://ai-proxy.your-company.com/v1');
+                              setCustomModel('gemini-1.5-flash');
+                            }}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              border: '1px solid rgba(16, 185, 129, 0.3)',
+                              background: 'rgba(16, 185, 129, 0.1)',
+                              color: 'var(--accent-emerald)',
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Preset: Internal Corp Proxy
+                          </button>
+                        </div>
+                      )}
+
+                      {aiProvider === 'openai_compatible' && (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomEndpoint('http://localhost:11434/v1');
+                              setCustomModel('llama3.2');
+                            }}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              border: '1px solid rgba(168, 85, 247, 0.3)',
+                              background: 'rgba(168, 85, 247, 0.1)',
+                              color: 'var(--accent-purple)',
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Preset: Ollama (:11434)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomEndpoint('http://localhost:1234/v1');
+                              setCustomModel('local-model');
+                            }}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              border: '1px solid rgba(6, 182, 212, 0.3)',
+                              background: 'rgba(6, 182, 212, 0.1)',
+                              color: 'var(--accent-cyan)',
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Preset: LM Studio (:1234)
+                          </button>
+                        </div>
+                      )}
+
+                      {/* API Key Input */}
+                      <div className="form-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <label className="form-label" htmlFor="custom-api-key-input">
+                            {selectedProviderMeta.name} {aiProvider === 'openai_compatible' ? 'API Key (Optional)' : 'API Key'}
+                          </label>
+                          {selectedProviderMeta.keyUrl && (
+                            <a
+                              href={selectedProviderMeta.keyUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ fontSize: '0.75rem', color: selectedProviderMeta.badgeColor, display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+                            >
+                              Get {selectedProviderMeta.name} Key <ExternalLink size={12} />
+                            </a>
+                          )}
+                        </div>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            id="custom-api-key-input"
+                            type={showKey ? 'text' : 'password'}
+                            className="form-input"
+                            placeholder={isLocked && enterprisePolicy.hasCustomApiKey ? '•••••••••••••••• (Managed by Corporate IT Policy)' : (selectedProviderMeta.placeholderKey || 'sk-...')}
+                            disabled={isLocked}
+                            value={customApiKey}
+                            onChange={(e) => {
+                              setCustomApiKey(e.target.value);
+                              storageService.setProviderApiKey(aiProvider, e.target.value);
+                            }}
+                            style={{ paddingRight: '70px', fontFamily: 'var(--font-mono)', opacity: isLocked ? 0.75 : 1, cursor: isLocked ? 'not-allowed' : 'text' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowKey(!showKey)}
+                            style={{
+                              position: 'absolute',
+                              right: '8px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--text-muted)',
+                              fontSize: '0.75rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {showKey ? 'Hide' : 'Show'}
+                          </button>
+                        </div>
                       </div>
 
+                      {/* Popular Models Chips */}
+                      {selectedProviderMeta.popularModels && selectedProviderMeta.popularModels.length > 0 && (
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: '0.75rem' }}>
+                            Popular Models (Click to Select)
+                          </label>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {selectedProviderMeta.popularModels.map((m) => {
+                              const isCurModel = (customModel === m.id);
+                              return (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  onClick={() => setCustomModel(m.id)}
+                                  style={{
+                                    padding: '5px 10px',
+                                    borderRadius: '6px',
+                                    border: isCurModel ? `1.5px solid ${selectedProviderMeta.badgeColor}` : '1px solid var(--border-color)',
+                                    background: isCurModel ? `${selectedProviderMeta.badgeColor}22` : 'var(--bg-input)',
+                                    color: isCurModel ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                    fontSize: '0.74rem',
+                                    fontWeight: isCurModel ? 700 : 500,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                >
+                                  {isCurModel && <Check size={12} color={selectedProviderMeta.badgeColor} />}
+                                  <span>{m.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Model Identifier input */}
                       <div className="form-group">
-                        <label className="form-label">Corporate One API / Gateway URL</label>
+                        <label className="form-label">Model Identifier</label>
                         <input
                           type="text"
                           className="form-input"
-                          placeholder="https://oneapi.your-company.com/v1"
-                          disabled={isLocked}
-                          value={customEndpoint}
-                          onChange={(e) => setCustomEndpoint(e.target.value)}
-                          style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', opacity: isLocked ? 0.75 : 1, cursor: isLocked ? 'not-allowed' : 'text' }}
-                        />
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                          Standard OpenAI-compatible base URL of your company's One API or LiteLLM gateway.
-                        </span>
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">Corporate Model Identifier</label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="gpt-4o, claude-3-5-sonnet, gemini-1.5-flash, deepseek-chat, qwen2.5-72b..."
+                          placeholder={selectedProviderMeta.defaultModel}
                           disabled={isLocked}
                           value={customModel}
                           onChange={(e) => setCustomModel(e.target.value)}
                           style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', opacity: isLocked ? 0.75 : 1, cursor: isLocked ? 'not-allowed' : 'text' }}
                         />
                         <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                          Target model name configured on your corporate gateway (e.g. gpt-4o, claude-3-5-sonnet, gemini-1.5-flash).
+                          Target model identifier (e.g. {selectedProviderMeta.defaultModel}). You can also type any custom model ID or fine-tuned checkpoint.
                         </span>
                       </div>
 
-                      <div className="form-group">
-                        <label className="form-label">Corporate Access Token / Bearer Key</label>
-                        <input
-                          type="password"
-                          className="form-input"
-                          placeholder={isLocked && enterprisePolicy.hasCustomApiKey ? '•••••••••••••••• (Managed by Corporate IT Policy)' : 'sk-... (Corporate token issued by One API / IT)'}
-                          disabled={isLocked}
-                          value={customApiKey}
-                          onChange={(e) => setCustomApiKey(e.target.value)}
-                          style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', opacity: isLocked ? 0.75 : 1, cursor: isLocked ? 'not-allowed' : 'text' }}
-                        />
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <button
-                          type="button"
-                          className="preset-chip"
-                          onClick={handleTestCustomEndpoint}
-                          disabled={endpointTestStatus?.loading}
-                          style={{ padding: '6px 14px', fontSize: '0.78rem' }}
-                        >
-                          {endpointTestStatus?.loading ? 'Testing Corporate Gateway...' : 'Test Corporate Connection'}
-                        </button>
-                        {endpointTestStatus && (
-                          <span style={{ fontSize: '0.78rem', color: endpointTestStatus.success ? '#34d399' : '#f87171', fontWeight: 600 }}>
-                            {endpointTestStatus.message}
+                      {/* Endpoint URL (Collapsible for managed cloud, always visible for Corporate & Local) */}
+                      {(aiProvider === 'corporate_gateway' || aiProvider === 'openai_compatible') ? (
+                        <div className="form-group">
+                          <label className="form-label">API Endpoint URL</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder={selectedProviderMeta.endpoint}
+                            disabled={isLocked}
+                            value={customEndpoint}
+                            onChange={(e) => setCustomEndpoint(e.target.value)}
+                            style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', opacity: isLocked ? 0.75 : 1, cursor: isLocked ? 'not-allowed' : 'text' }}
+                          />
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                            Base URL of the OpenAI-compatible service (e.g. {selectedProviderMeta.endpoint}).
                           </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: '2px', marginBottom: '4px' }}>
+                          <button
+                            type="button"
+                            onClick={() => setShowAdvancedEndpoint(!showAdvancedEndpoint)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--text-muted)',
+                              fontSize: '0.74rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: 0
+                            }}
+                          >
+                            {showAdvancedEndpoint ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                            <span>Advanced: Custom Proxy / Relay Endpoint URL</span>
+                          </button>
 
-                  {/* BYOM Local Section */}
-                  {aiProvider === 'openai_compatible' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCustomEndpoint('http://localhost:11434/v1');
-                            setCustomModel('llama3.2');
-                          }}
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: '4px',
-                            border: '1px solid rgba(168, 85, 247, 0.3)',
-                            background: 'rgba(168, 85, 247, 0.1)',
-                            color: 'var(--accent-purple)',
-                            fontSize: '0.72rem',
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Preset: Ollama (:11434)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCustomEndpoint('http://localhost:1234/v1');
-                            setCustomModel('local-model');
-                          }}
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: '4px',
-                            border: '1px solid rgba(6, 182, 212, 0.3)',
-                            background: 'rgba(6, 182, 212, 0.1)',
-                            color: 'var(--accent-cyan)',
-                            fontSize: '0.72rem',
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Preset: LM Studio (:1234)
-                        </button>
-                      </div>
+                          {showAdvancedEndpoint && (
+                            <div className="form-group" style={{ marginTop: '8px' }}>
+                              <input
+                                type="text"
+                                className="form-input"
+                                placeholder={selectedProviderMeta.endpoint}
+                                disabled={isLocked}
+                                value={customEndpoint}
+                                onChange={(e) => setCustomEndpoint(e.target.value)}
+                                style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', opacity: isLocked ? 0.75 : 1, cursor: isLocked ? 'not-allowed' : 'text' }}
+                              />
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                Default: {selectedProviderMeta.endpoint}. Only edit this if you route traffic through an enterprise reverse proxy.
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
-                      <div className="form-group">
-                        <label className="form-label">API Endpoint URL</label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="http://localhost:11434/v1"
-                          disabled={isLocked}
-                          value={customEndpoint}
-                          onChange={(e) => setCustomEndpoint(e.target.value)}
-                          style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', opacity: isLocked ? 0.75 : 1, cursor: isLocked ? 'not-allowed' : 'text' }}
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">Model Name</label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="llama3.2, mistral, qwen2.5, deepseek-r1..."
-                          disabled={isLocked}
-                          value={customModel}
-                          onChange={(e) => setCustomModel(e.target.value)}
-                          style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', opacity: isLocked ? 0.75 : 1, cursor: isLocked ? 'not-allowed' : 'text' }}
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">API Key / Token (Optional for Local)</label>
-                        <input
-                          type="password"
-                          className="form-input"
-                          placeholder={isLocked && enterprisePolicy.hasCustomApiKey ? '•••••••••••••••• (Managed by Corporate IT Policy)' : 'Leave empty for local Ollama / LM Studio'}
-                          disabled={isLocked}
-                          value={customApiKey}
-                          onChange={(e) => setCustomApiKey(e.target.value)}
-                          style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', opacity: isLocked ? 0.75 : 1, cursor: isLocked ? 'not-allowed' : 'text' }}
-                        />
-                      </div>
-
+                      {/* Connection Test Button */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <button
                           type="button"
@@ -1045,7 +1229,16 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                           disabled={endpointTestStatus?.loading}
                           style={{ padding: '6px 14px', fontSize: '0.78rem' }}
                         >
-                          {endpointTestStatus?.loading ? 'Testing...' : 'Test Endpoint Connection'}
+                          {endpointTestStatus?.loading ? (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Loader2 size={13} className="spinner" /> Testing {selectedProviderMeta.name}...
+                            </span>
+                          ) : (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {renderProviderIcon(selectedProviderMeta.iconName, 'currentColor', 13)}
+                              Test {selectedProviderMeta.name} Connection
+                            </span>
+                          )}
                         </button>
                         {endpointTestStatus && (
                           <span style={{ fontSize: '0.78rem', color: endpointTestStatus.success ? '#34d399' : '#f87171', fontWeight: 600 }}>
@@ -2010,7 +2203,30 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                               </span>
                             </div>
                             <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.4 }}>
-                              {licenseState.isLicensed && `Commercial license active: ${licenseState.licenseKey.slice(0, 12)}••••`}
+                              {licenseState.isLicensed && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+                                    {licenseState.organizationName && (
+                                      <span style={{ color: 'var(--text-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <Building2 size={13} color="var(--primary)" />
+                                        {licenseState.organizationName}
+                                      </span>
+                                    )}
+                                    {licenseState.seats > 0 && (
+                                      <span style={{ color: 'var(--text-muted)' }}>
+                                        • {licenseState.seats} Seat{licenseState.seats > 1 ? 's' : ''} Licensed
+                                      </span>
+                                    )}
+                                    <span style={{ color: 'var(--text-muted)' }}>
+                                      • {licenseState.isPerpetual ? 'Perpetual Lifetime' : `Expires: ${licenseState.expiresAt || 'N/A'}`}
+                                    </span>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', color: '#10b981', fontWeight: 600 }}>
+                                    <ShieldCheck size={13} />
+                                    <span>Ed25519 Cryptographically Signed &amp; Verified (Offline Safe)</span>
+                                  </div>
+                                </div>
+                              )}
                               {!licenseState.isLicensed && licenseState.isCommercialTrialActive && 'Commercial entities receive 40 calendar days of fully functional internal evaluation under Section 2.1 of the EULA.'}
                               {!licenseState.isLicensed && !licenseState.isCommercialTrialActive && 'Under Section 2.4 of the EULA, continued commercial use requires purchasing a commercial license.'}
                             </div>
@@ -2042,7 +2258,7 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                         <input
                           type="text"
                           className="settings-input"
-                          placeholder="e.g. NL-PRO-88F2-31CA-99B4"
+                          placeholder="Paste cryptographic key (NL1-...) or standard license key"
                           value={inputLicenseKey}
                           onChange={(e) => setInputLicenseKey(e.target.value)}
                           style={{ flex: 1, fontFamily: 'monospace', fontSize: '0.85rem' }}
@@ -2091,15 +2307,21 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
 
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
                         {/* Plan A: Pro Annual */}
-                        <div className="settings-card" style={{
-                          padding: '14px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          border: '1px solid var(--primary)',
-                          position: 'relative',
-                          background: 'linear-gradient(180deg, rgba(99, 102, 241, 0.05) 0%, transparent 100%)'
-                        }}>
+                        <div 
+                          className="settings-card" 
+                          onClick={() => handleSelectTier('annual')}
+                          style={{
+                            padding: '14px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            border: selectedTier === 'annual' ? '2px solid var(--primary)' : '1px solid var(--primary)',
+                            position: 'relative',
+                            background: selectedTier === 'annual' ? 'rgba(99, 102, 241, 0.1)' : 'linear-gradient(180deg, rgba(99, 102, 241, 0.05) 0%, transparent 100%)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
                           <div style={{
                             position: 'absolute',
                             top: '-9px',
@@ -2117,11 +2339,11 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                           <div>
                             <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>Single-User Annual</div>
                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '6px 0 8px' }}>
-                              <span style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)' }}>$34</span>
+                              <span style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)' }}>$17</span>
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>/ year</span>
                             </div>
                             <div style={{ fontSize: '0.72rem', color: 'var(--accent-emerald)', fontWeight: 600, marginBottom: '8px' }}>
-                              $2.85/month • Save 29%
+                              $1.42/month • Exceptional value
                             </div>
                             <ul style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', paddingLeft: '14px', margin: 0, lineHeight: 1.6 }}>
                               <li>1 named commercial user</li>
@@ -2130,10 +2352,9 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                               <li>Priority corporate support</li>
                             </ul>
                           </div>
-                          <a
-                            href="https://nativelingo.studiopk.dev/pricing"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleSelectTier('annual'); }}
                             className="btn-primary"
                             style={{
                               marginTop: '12px',
@@ -2141,23 +2362,30 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                               padding: '7px 0',
                               fontSize: '0.78rem',
                               display: 'block',
-                              textDecoration: 'none'
+                              width: '100%',
+                              cursor: 'pointer'
                             }}
                           >
-                            Purchase Annual ($34)
-                          </a>
+                            {selectedTier === 'annual' ? 'Options Open ▲' : 'Purchase / Test ($17)'}
+                          </button>
                         </div>
 
                         {/* Plan B: Perpetual Lifetime */}
-                        <div className="settings-card" style={{
-                          padding: '14px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          border: '1px solid rgba(245, 158, 11, 0.4)',
-                          background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.05) 0%, transparent 100%)',
-                          position: 'relative'
-                        }}>
+                        <div 
+                          className="settings-card" 
+                          onClick={() => handleSelectTier('perpetual')}
+                          style={{
+                            padding: '14px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            border: selectedTier === 'perpetual' ? '2px solid var(--accent-amber)' : '1px solid rgba(245, 158, 11, 0.4)',
+                            background: selectedTier === 'perpetual' ? 'rgba(245, 158, 11, 0.1)' : 'linear-gradient(180deg, rgba(245, 158, 11, 0.05) 0%, transparent 100%)',
+                            position: 'relative',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
                           <div style={{
                             position: 'absolute',
                             top: '-9px',
@@ -2175,8 +2403,8 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                           <div>
                             <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>Single-User Perpetual</div>
                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', margin: '6px 0 8px' }}>
-                              <span style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)' }}>$59</span>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textDecoration: 'line-through' }}>$74</span>
+                              <span style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)' }}>$29</span>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textDecoration: 'line-through' }}>$37</span>
                             </div>
                             <div style={{ fontSize: '0.72rem', color: 'var(--accent-amber)', fontWeight: 600, marginBottom: '8px' }}>
                               One-time purchase • First 200 copies
@@ -2185,13 +2413,12 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                               <li>Own your version forever</li>
                               <li>12 months of version updates</li>
                               <li>2 workstations included</li>
-                              <li>Optional renewal at $24/yr</li>
+                              <li>Optional renewal at $12/yr</li>
                             </ul>
                           </div>
-                          <a
-                            href="https://nativelingo.studiopk.dev/pricing"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleSelectTier('perpetual'); }}
                             className="preset-chip"
                             style={{
                               marginTop: '12px',
@@ -2199,26 +2426,35 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                               padding: '7px 0',
                               fontSize: '0.78rem',
                               display: 'block',
-                              textDecoration: 'none',
+                              width: '100%',
                               borderColor: 'var(--accent-amber)',
-                              color: 'var(--accent-amber)'
+                              color: 'var(--accent-amber)',
+                              cursor: 'pointer'
                             }}
                           >
-                            Get Perpetual ($59)
-                          </a>
+                            {selectedTier === 'perpetual' ? 'Options Open ▲' : 'Purchase / Test ($29)'}
+                          </button>
                         </div>
 
                         {/* Plan C: Team Annual */}
-                        <div className="settings-card" style={{
-                          padding: '14px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between'
-                        }}>
+                        <div 
+                          className="settings-card" 
+                          onClick={() => handleSelectTier('team')}
+                          style={{
+                            padding: '14px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            border: selectedTier === 'team' ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                            background: selectedTier === 'team' ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
                           <div>
                             <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>Multi-User Team</div>
                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '6px 0 8px' }}>
-                              <span style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)' }}>$49</span>
+                              <span style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)' }}>$24</span>
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>/ seat / yr</span>
                             </div>
                             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '8px' }}>
@@ -2231,10 +2467,9 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                               <li>Priority bug fixes & SLA</li>
                             </ul>
                           </div>
-                          <a
-                            href="https://nativelingo.studiopk.dev/pricing"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleSelectTier('team'); }}
                             className="preset-chip"
                             style={{
                               marginTop: '12px',
@@ -2242,13 +2477,139 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                               padding: '7px 0',
                               fontSize: '0.78rem',
                               display: 'block',
-                              textDecoration: 'none'
+                              width: '100%',
+                              cursor: 'pointer'
                             }}
                           >
-                            Contact Team Sales
-                          </a>
+                            {selectedTier === 'team' ? 'Options Open ▲' : 'Purchase / Test Team ($24)'}
+                          </button>
                         </div>
                       </div>
+
+                      {/* Selected Tier Interactive Action Drawer */}
+                      {selectedTier && (
+                        <div className="settings-card" style={{
+                          marginTop: '12px',
+                          padding: '16px',
+                          border: '1.5px solid var(--primary)',
+                          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(16, 185, 129, 0.05) 100%)',
+                          animation: 'fadeIn 0.2s ease'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Sparkles size={16} color="var(--primary)" />
+                              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                {selectedTier === 'annual' && 'Commercial Single-User Annual ($17 / year)'}
+                                {selectedTier === 'perpetual' && 'Commercial Single-User Perpetual ($29 one-time)'}
+                                {selectedTier === 'team' && 'Commercial Multi-User Team ($24 / seat / year)'}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedTier(null)}
+                              className="btn-icon"
+                              style={{ width: '24px', height: '24px', padding: 0, cursor: 'pointer' }}
+                              title="Close Drawer"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+
+                          <p style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', margin: '0 0 12px', lineHeight: 1.5 }}>
+                            Select an option below to test this tier immediately or request an official corporate order:
+                          </p>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                            {/* Option 1: Instant Demo Evaluation */}
+                            <button
+                              type="button"
+                              className="btn-primary"
+                              onClick={() => handleInstantDemoActivate(selectedTier)}
+                              style={{
+                                padding: '10px 14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                border: 'none',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <Zap size={14} />
+                              <span>Instant 1-Click Test Activation</span>
+                            </button>
+
+                            {/* Option 2: Copy Order Details */}
+                            <button
+                              type="button"
+                              className="preset-chip"
+                              onClick={() => handleCopyOrderDetails(selectedTier)}
+                              style={{
+                                padding: '10px 14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {copiedOrder ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
+                              <span>{copiedOrder ? 'Copied to Clipboard!' : 'Copy Order / Invoice Request'}</span>
+                            </button>
+
+                            {/* Option 3: Send Order Email */}
+                            <button
+                              type="button"
+                              className="preset-chip"
+                              onClick={() => handleEmailOrder(selectedTier)}
+                              style={{
+                                padding: '10px 14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <Mail size={14} />
+                              <span>Email Licensing Team</span>
+                            </button>
+
+                            {/* Option 4: Focus Key Input */}
+                            <button
+                              type="button"
+                              className="preset-chip"
+                              onClick={() => {
+                                const input = document.querySelector('input[placeholder*="license key"]');
+                                if (input) {
+                                  input.focus();
+                                  input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }
+                              }}
+                              style={{
+                                padding: '10px 14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <Key size={14} />
+                              <span>Enter Official Key (NL1-...)</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}

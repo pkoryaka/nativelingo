@@ -101,17 +101,17 @@ NativeLingo works natively across standard Windows applications via custom Win32
 
 ---
 
-## 💳 Pricing & Commercial Licenses
+## 💳 Licensing & Commercial Tiers
 
-NativeLingo uses a **14-Day Reverse Trial** and a **client-side software license**. You bring your own free Gemini API key or local Ollama model—meaning **zero token markups** or surprise usage bills. See [`PRICING.md`](./PRICING.md) for the full commercial and refund policy.
+NativeLingo follows a **Dual-Use / Fair-Code License** under the [NativeLingo EULA](./LICENSE). You bring your own free Gemini API key or local Ollama model—meaning **zero token markups** or surprise usage bills. See [`PRICING.md`](./PRICING.md) for full terms.
 
-| Tier | Price | What's Included |
+| Tier | Price | Scope & What's Included |
 | :--- | :---: | :--- |
-| **Free Edition** | **$0** (Forever) | Unlimited translation hotkey, Slot 1 rewrite HUD preview + manual copy, $0 BYOK inference. |
-| **14-Day Pro Trial** | **$0** (No Card) | Full Pro Edition access for 14 days on first install. Gracefully continues as Free Edition. |
-| **Pro Annual** | **$34 / year** | Instant in-place auto-paste (<250ms), all 3 rewrite slots, 2 personal devices, all updates ($2.85/mo). |
-| **Pro Perpetual** | **$74 one-time** | **$59 Launch Deal** (first 200 copies). Own your version forever + 12 months updates ($24/yr renewal). |
-| **Team Annual** | **$49 / seat / yr** | Minimum 3 seats. Centralized license dashboard, standard business invoicing, priority support. |
+| **Personal & Educational** | **$0** (Forever) | Full capabilities (auto-paste, 3 hotkey slots, jargon explainer) for individuals, study, and research on unlimited devices. |
+| **Commercial Evaluation** | **$0** (40 Days) | 40-day fully functional evaluation for companies and workplace teams to assess internal fit. |
+| **Commercial Pro Annual** | **$34 / year** | 1 named commercial user across 2 workstations, all updates, priority corporate support ($2.85/mo). |
+| **Commercial Perpetual** | **$74 one-time** | **$59 Launch Deal** (first 200 copies). Own your version forever for business use + 12 months updates ($24/yr renewal). |
+| **Multi-User Team** | **$49 / seat / yr** | Minimum 3 seats. Centralized license dashboard, reassignable seats, standard business invoicing, priority SLA. |
 
 ---
 

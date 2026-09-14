@@ -33,24 +33,40 @@ export function Header({ currentModel, onOpenSettings, onOpenHistory, hasApiKey,
         <button
           type="button"
           onClick={() => onOpenSettings && onOpenSettings('license')}
-          title={license.isPro 
-            ? (license.plan === 'trial' ? `Reverse Trial: ${license.trialDaysRemaining} days remaining` : 'NativeLingo Pro Active') 
-            : 'NativeLingo Free Edition - Click to upgrade'}
+          title={
+            license.useType === 'personal'
+              ? 'Personal & Educational Use: 100% Free Forever (EULA Sec. 3)'
+              : license.isLicensed
+                ? 'Commercial License Active'
+                : license.isCommercialTrialActive
+                  ? `Commercial Evaluation: ${license.commercialDaysRemaining} days remaining (EULA Sec. 2)`
+                  : 'Commercial Evaluation Expired - Click to license'
+          }
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '5px',
-            background: license.isPro
-              ? (license.plan === 'trial' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(16, 185, 129, 0.12)')
-              : 'rgba(100, 116, 139, 0.12)',
+            background: license.useType === 'personal'
+              ? 'rgba(16, 185, 129, 0.12)'
+              : license.isLicensed
+                ? 'rgba(16, 185, 129, 0.15)'
+                : license.isCommercialTrialActive
+                  ? 'rgba(245, 158, 11, 0.12)'
+                  : 'rgba(239, 68, 68, 0.12)',
             border: `1px solid ${
-              license.isPro
-                ? (license.plan === 'trial' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(16, 185, 129, 0.3)')
-                : 'rgba(100, 116, 139, 0.25)'
+              license.useType === 'personal'
+                ? 'rgba(16, 185, 129, 0.3)'
+                : license.isLicensed
+                  ? 'rgba(16, 185, 129, 0.35)'
+                  : license.isCommercialTrialActive
+                    ? 'rgba(245, 158, 11, 0.3)'
+                    : 'rgba(239, 68, 68, 0.3)'
             }`,
-            color: license.isPro
-              ? (license.plan === 'trial' ? 'var(--accent-amber)' : 'var(--accent-emerald)')
-              : 'var(--text-secondary)',
+            color: license.useType === 'personal' || license.isLicensed
+              ? 'var(--accent-emerald)'
+              : license.isCommercialTrialActive
+                ? 'var(--accent-amber)'
+                : '#f87171',
             padding: '4px 9px',
             borderRadius: '999px',
             fontSize: '0.72rem',
@@ -58,20 +74,25 @@ export function Header({ currentModel, onOpenSettings, onOpenHistory, hasApiKey,
             cursor: 'pointer'
           }}
         >
-          {license.plan === 'trial' ? (
-            <>
-              <Clock size={12} />
-              <span>{license.trialDaysRemaining}d Trial</span>
-            </>
-          ) : license.isPro ? (
+          {license.useType === 'personal' ? (
             <>
               <BadgeCheck size={12} />
-              <span>Pro</span>
+              <span>Personal (Free)</span>
+            </>
+          ) : license.isLicensed ? (
+            <>
+              <BadgeCheck size={12} />
+              <span>Commercial Pro</span>
+            </>
+          ) : license.isCommercialTrialActive ? (
+            <>
+              <Clock size={12} />
+              <span>Evaluation ({license.commercialDaysRemaining}d)</span>
             </>
           ) : (
             <>
-              <Sparkles size={12} />
-              <span>Free</span>
+              <Clock size={12} />
+              <span>Evaluation Expired</span>
             </>
           )}
         </button>

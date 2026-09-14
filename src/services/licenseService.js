@@ -1,11 +1,12 @@
 const STORAGE_KEYS = {
   LICENSE_KEY: 'nativelingo_license_key',
-  LICENSE_PLAN: 'nativelingo_license_plan', // 'trial' | 'pro' | 'perpetual' | 'free'
-  TRIAL_START: 'nativelingo_trial_start',
+  LICENSE_PLAN: 'nativelingo_license_plan', // 'commercial_pro' | 'commercial_perpetual' | 'commercial_team'
+  USE_TYPE: 'nativelingo_use_type', // 'personal' | 'commercial'
+  COMMERCIAL_TRIAL_START: 'nativelingo_commercial_trial_start',
   ACTIVATED_AT: 'nativelingo_activated_at'
 };
 
-const TRIAL_DURATION_DAYS = 14;
+const COMMERCIAL_TRIAL_DAYS = 40;
 
 export const licenseService = {
   /**
@@ -14,40 +15,63 @@ export const licenseService = {
   getLicenseState: () => {
     let licenseKey = localStorage.getItem(STORAGE_KEYS.LICENSE_KEY) || '';
     let plan = localStorage.getItem(STORAGE_KEYS.LICENSE_PLAN);
-    let trialStart = localStorage.getItem(STORAGE_KEYS.TRIAL_START);
+    let useType = localStorage.getItem(STORAGE_KEYS.USE_TYPE) || 'personal';
+    let commercialTrialStart = localStorage.getItem(STORAGE_KEYS.COMMERCIAL_TRIAL_START);
 
-    // First run: Initialize 14-day Pro trial (Reverse Trial)
-    if (!trialStart && !licenseKey) {
-      trialStart = new Date().toISOString();
-      localStorage.setItem(STORAGE_KEYS.TRIAL_START, trialStart);
-      localStorage.setItem(STORAGE_KEYS.LICENSE_PLAN, 'trial');
-      plan = 'trial';
+    const isLicensed = Boolean(licenseKey && licenseKey.trim().length >= 8);
+
+    if (useType === 'commercial' && !commercialTrialStart && !isLicensed) {
+      commercialTrialStart = new Date().toISOString();
+      localStorage.setItem(STORAGE_KEYS.COMMERCIAL_TRIAL_START, commercialTrialStart);
     }
 
     const now = Date.now();
-    const startDate = trialStart ? new Date(trialStart).getTime() : now;
+    const startDate = commercialTrialStart ? new Date(commercialTrialStart).getTime() : now;
     const elapsedMs = now - startDate;
     const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
-    const trialDaysRemaining = Math.max(0, Math.ceil(TRIAL_DURATION_DAYS - elapsedDays));
+    const commercialDaysRemaining = Math.max(0, Math.ceil(COMMERCIAL_TRIAL_DAYS - elapsedDays));
 
-    const isTrialActive = plan === 'trial' && trialDaysRemaining > 0;
-    const isLicensed = Boolean(licenseKey && licenseKey.trim().length >= 8);
-    const isPro = isLicensed || isTrialActive;
+    const isCommercialTrialActive = useType === 'commercial' && commercialDaysRemaining > 0 && !isLicensed;
+    const isCommercialExpired = useType === 'commercial' && commercialDaysRemaining === 0 && !isLicensed;
 
-    const currentPlan = isLicensed ? (plan || 'pro') : (isTrialActive ? 'trial' : 'free');
+    // In personal mode, software is 100% free perpetually under Section 3 of EULA.
+    // In commercial mode, it is active during the 40-day trial or with a valid key.
+    const isPro = useType === 'personal' || isLicensed || isCommercialTrialActive;
+
+    let currentPlan = 'personal_free';
+    if (isLicensed) {
+      currentPlan = plan || 'commercial_pro';
+    } else if (useType === 'commercial') {
+      currentPlan = isCommercialTrialActive ? 'commercial_trial' : 'commercial_expired';
+    }
 
     return {
       isPro,
+      useType, // 'personal' | 'commercial'
       plan: currentPlan,
       licenseKey,
-      isTrialActive,
-      trialDaysRemaining,
-      trialDurationDays: TRIAL_DURATION_DAYS
+      isLicensed,
+      isCommercialTrialActive,
+      isCommercialExpired,
+      commercialDaysRemaining,
+      commercialTrialDays: COMMERCIAL_TRIAL_DAYS
     };
   },
 
   /**
-   * Validates and activates a license key.
+   * Switch between Personal (100% Free) and Commercial (40-day trial / Paid) deployment.
+   */
+  setUseType: (type) => {
+    const valid = type === 'commercial' ? 'commercial' : 'personal';
+    localStorage.setItem(STORAGE_KEYS.USE_TYPE, valid);
+    if (valid === 'commercial' && !localStorage.getItem(STORAGE_KEYS.COMMERCIAL_TRIAL_START)) {
+      localStorage.setItem(STORAGE_KEYS.COMMERCIAL_TRIAL_START, new Date().toISOString());
+    }
+    return licenseService.getLicenseState();
+  },
+
+  /**
+   * Validates and activates a commercial license key.
    * Supports offline format verification and Lemon Squeezy / Gumroad license patterns.
    */
   activateLicense: async (key) => {
@@ -64,21 +88,25 @@ export const licenseService = {
     }
 
     const isPerpetual = trimmed.includes('PERP') || trimmed.includes('LIFETIME');
-    const planType = isPerpetual ? 'perpetual' : 'pro';
+    const isTeam = trimmed.includes('TEAM');
+    const planType = isTeam ? 'commercial_team' : (isPerpetual ? 'commercial_perpetual' : 'commercial_pro');
 
     localStorage.setItem(STORAGE_KEYS.LICENSE_KEY, trimmed);
     localStorage.setItem(STORAGE_KEYS.LICENSE_PLAN, planType);
+    localStorage.setItem(STORAGE_KEYS.USE_TYPE, 'commercial');
     localStorage.setItem(STORAGE_KEYS.ACTIVATED_AT, new Date().toISOString());
 
     return { 
       success: true, 
       plan: planType, 
-      message: isPerpetual ? 'NativeLingo Perpetual License activated!' : 'NativeLingo Pro License activated!' 
+      message: isPerpetual 
+        ? 'NativeLingo Commercial Perpetual License activated!' 
+        : (isTeam ? 'NativeLingo Multi-User Team License activated!' : 'NativeLingo Commercial Pro License activated!') 
     };
   },
 
   /**
-   * Clears the current license key and returns to Free or Trial.
+   * Clears the current license key and returns to default state.
    */
   deactivateLicense: () => {
     localStorage.removeItem(STORAGE_KEYS.LICENSE_KEY);
@@ -87,24 +115,22 @@ export const licenseService = {
   },
 
   /**
-   * Feature gate: Can the user use direct in-place auto paste-back?
-   * In Free mode, text is displayed in the HUD preview for manual copying.
+   * Feature gate: In-place auto paste-back.
+   * Free and unlocked for Personal use, and active in Commercial trial/licensed mode.
    */
   canUseAutoPaste: () => {
     return licenseService.getLicenseState().isPro;
   },
 
   /**
-   * Feature gate: Can the user use all 3 in-place slots?
-   * In Free mode, Slot 1 is available. Slots 2 and 3 require Pro or active trial.
+   * Feature gate: All 3 rewrite slots.
    */
-  canUseSlot: (slotId) => {
-    if (slotId === 1) return true;
+  canUseSlot: () => {
     return licenseService.getLicenseState().isPro;
   },
 
   /**
-   * Feature gate: Can the user use advanced jargon & tone explanation?
+   * Feature gate: Jargon and tone explainer.
    */
   canUseJargonExplainer: () => {
     return licenseService.getLicenseState().isPro;

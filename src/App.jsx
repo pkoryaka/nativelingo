@@ -110,7 +110,7 @@ export function App() {
     if (!text || !text.trim()) return;
 
     const currentSettings = storageService.getSettings();
-    const isLocalOrProxy = currentSettings.aiProvider === 'openai_compatible';
+    const isLocalOrProxy = currentSettings.aiProvider === 'openai_compatible' || currentSettings.aiProvider === 'corporate_gateway';
     const currentKey = storageService.getApiKey();
 
     if (!isLocalOrProxy && !currentKey && !storageService.isEnterpriseManaged()) {
@@ -362,8 +362,20 @@ export function App() {
 
       {/* Header */}
       <Header
-        currentModel={settings.model || 'gemini-flash-lite-latest'}
-        hasApiKey={Boolean(apiKey)}
+        currentModel={
+          settings.aiProvider === 'corporate_gateway'
+            ? (settings.customModel || 'One API Gateway')
+            : settings.aiProvider === 'openai_compatible'
+              ? (settings.customModel || 'Local LLM')
+              : (settings.customGeminiModel || settings.model || 'gemini-flash-lite-latest')
+        }
+        hasApiKey={
+          settings.aiProvider === 'corporate_gateway'
+            ? Boolean(settings.customEndpoint)
+            : settings.aiProvider === 'openai_compatible'
+              ? true
+              : Boolean(apiKey)
+        }
         theme={theme}
         onToggleTheme={handleToggleTheme}
         onOpenSettings={handleOpenSettings}

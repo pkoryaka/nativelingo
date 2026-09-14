@@ -195,30 +195,39 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
   };
 
   const handleTestCustomEndpoint = async () => {
-    setEndpointTestStatus({ loading: true, message: `Connecting to ${customEndpoint}...` });
+    const ep = customEndpoint || (aiProvider === 'corporate_gateway' ? 'https://oneapi.corp.internal/v1' : 'http://localhost:11434/v1');
+    setEndpointTestStatus({ loading: true, message: `Connecting to ${ep}...` });
     try {
       if (window.electronAPI?.testEndpoint) {
-        await window.electronAPI.testEndpoint({
-          endpoint: customEndpoint,
+        const res = await window.electronAPI.testEndpoint({
+          endpoint: ep,
           model: customModel,
           apiKey: customApiKey
         });
-        setEndpointTestStatus({ success: true, message: `✓ Connected to ${customModel || 'model'} successfully!` });
+        if (res.success) {
+          setEndpointTestStatus({ success: true, message: res.text || `✓ Connected to ${customModel || 'model'} successfully!` });
+        } else {
+          setEndpointTestStatus({ success: false, message: res.text || 'Connection test failed.' });
+        }
       } else {
-        const url = `${customEndpoint.replace(/\/+$/, '')}/chat/completions`;
+        const url = `${ep.replace(/\/+$/, '')}/chat/completions`;
+        const headers = { 'Content-Type': 'application/json' };
+        if (customApiKey && customApiKey.trim()) {
+          headers['Authorization'] = `Bearer ${customApiKey.trim()}`;
+        }
         const res = await fetch(url, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${customApiKey || 'ollama'}`
-          },
+          headers,
           body: JSON.stringify({
-            model: customModel || 'llama3.2',
+            model: customModel || (aiProvider === 'corporate_gateway' ? 'gpt-4o' : 'llama3.2'),
             messages: [{ role: 'user', content: 'Say OK' }],
             max_tokens: 10
           })
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error?.message || `HTTP ${res.status}`);
+        }
         setEndpointTestStatus({ success: true, message: `✓ Connected to ${customModel || 'model'} successfully!` });
       }
     } catch (err) {
@@ -555,20 +564,19 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                   </div>
 
                   {/* Provider Switch Tabs */}
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                     <button
                       type="button"
                       disabled={isLocked}
                       onClick={() => setAiProvider('gemini')}
                       style={{
-                        flex: 1,
-                        padding: '8px 12px',
+                        padding: '9px 10px',
                         borderRadius: 'var(--radius-sm)',
-                        border: aiProvider === 'gemini' ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                        border: aiProvider === 'gemini' ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
                         background: aiProvider === 'gemini' ? 'rgba(99, 102, 241, 0.18)' : 'var(--bg-input)',
                         color: aiProvider === 'gemini' ? 'var(--text-primary)' : 'var(--text-secondary)',
                         fontWeight: 600,
-                        fontSize: '0.8rem',
+                        fontSize: '0.78rem',
                         cursor: isLocked ? 'not-allowed' : 'pointer',
                         opacity: isLocked && aiProvider !== 'gemini' ? 0.5 : 1,
                         display: 'flex',
@@ -579,22 +587,58 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                       }}
                     >
                       <Sparkles size={14} color={aiProvider === 'gemini' ? 'var(--primary)' : 'var(--text-muted)'} />
-                      <span>Google Gemini (Cloud)</span>
+                      <span>Google Gemini</span>
                     </button>
 
                     <button
                       type="button"
                       disabled={isLocked}
-                      onClick={() => setAiProvider('openai_compatible')}
+                      onClick={() => {
+                        setAiProvider('corporate_gateway');
+                        if (!customEndpoint || customEndpoint.includes('localhost')) {
+                          setCustomEndpoint('https://oneapi.corp.internal/v1');
+                          setCustomModel('gpt-4o');
+                        }
+                      }}
                       style={{
-                        flex: 1,
-                        padding: '8px 12px',
+                        padding: '9px 10px',
                         borderRadius: 'var(--radius-sm)',
-                        border: aiProvider === 'openai_compatible' ? '1px solid var(--accent-purple)' : '1px solid var(--border-color)',
-                        background: aiProvider === 'openai_compatible' ? 'rgba(168, 85, 247, 0.18)' : 'var(--bg-input)',
+                        border: aiProvider === 'corporate_gateway' ? '1.5px solid #8b5cf6' : '1px solid var(--border-color)',
+                        background: aiProvider === 'corporate_gateway' ? 'rgba(139, 92, 246, 0.18)' : 'var(--bg-input)',
+                        color: aiProvider === 'corporate_gateway' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        fontWeight: 600,
+                        fontSize: '0.78rem',
+                        cursor: isLocked ? 'not-allowed' : 'pointer',
+                        opacity: isLocked && aiProvider !== 'corporate_gateway' ? 0.5 : 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <Building2 size={14} color={aiProvider === 'corporate_gateway' ? '#a78bfa' : 'var(--text-muted)'} />
+                      <span>Corporate One API</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => {
+                        setAiProvider('openai_compatible');
+                        if (!customEndpoint || customEndpoint.includes('oneapi.corp')) {
+                          setCustomEndpoint('http://localhost:11434/v1');
+                          setCustomModel('llama3.2');
+                        }
+                      }}
+                      style={{
+                        padding: '9px 10px',
+                        borderRadius: 'var(--radius-sm)',
+                        border: aiProvider === 'openai_compatible' ? '1.5px solid var(--accent-emerald)' : '1px solid var(--border-color)',
+                        background: aiProvider === 'openai_compatible' ? 'rgba(16, 185, 129, 0.18)' : 'var(--bg-input)',
                         color: aiProvider === 'openai_compatible' ? 'var(--text-primary)' : 'var(--text-secondary)',
                         fontWeight: 600,
-                        fontSize: '0.8rem',
+                        fontSize: '0.78rem',
                         cursor: isLocked ? 'not-allowed' : 'pointer',
                         opacity: isLocked && aiProvider !== 'openai_compatible' ? 0.5 : 1,
                         display: 'flex',
@@ -604,8 +648,8 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                         transition: 'all 0.2s ease'
                       }}
                     >
-                      <Server size={14} color={aiProvider === 'openai_compatible' ? 'var(--accent-purple)' : 'var(--text-muted)'} />
-                      <span>BYOM (Ollama / Local LLM)</span>
+                      <Server size={14} color={aiProvider === 'openai_compatible' ? 'var(--accent-emerald)' : 'var(--text-muted)'} />
+                      <span>Local LLM</span>
                     </button>
                   </div>
 
@@ -614,24 +658,34 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                     display: 'flex',
                     alignItems: 'flex-start',
                     gap: '10px',
-                    background: aiProvider === 'gemini' ? 'rgba(99, 102, 241, 0.08)' : 'rgba(16, 185, 129, 0.08)',
-                    border: `1px solid ${aiProvider === 'gemini' ? 'rgba(99, 102, 241, 0.25)' : 'rgba(16, 185, 129, 0.25)'}`,
+                    background: aiProvider === 'gemini' 
+                      ? 'rgba(99, 102, 241, 0.08)' 
+                      : (aiProvider === 'corporate_gateway' ? 'rgba(139, 92, 246, 0.08)' : 'rgba(16, 185, 129, 0.08)'),
+                    border: `1px solid ${
+                      aiProvider === 'gemini' 
+                        ? 'rgba(99, 102, 241, 0.25)' 
+                        : (aiProvider === 'corporate_gateway' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(16, 185, 129, 0.25)')
+                    }`,
                     borderRadius: 'var(--radius-sm)',
                     padding: '10px 12px',
                     fontSize: '0.75rem',
                     lineHeight: '1.4'
                   }}>
                     <div style={{ flexShrink: 0, marginTop: '2px' }}>
-                      {aiProvider === 'gemini' ? <Sparkles size={16} color="var(--primary)" /> : <CheckCircle2 size={16} color="#10b981" />}
+                      {aiProvider === 'gemini' && <Sparkles size={16} color="var(--primary)" />}
+                      {aiProvider === 'corporate_gateway' && <Building2 size={16} color="#8b5cf6" />}
+                      {aiProvider === 'openai_compatible' && <CheckCircle2 size={16} color="#10b981" />}
                     </div>
                     <div>
                       <strong style={{ color: 'var(--text-primary)', display: 'block', marginBottom: '2px' }}>
-                        {aiProvider === 'gemini' ? '☁️ Direct Cloud Routing (Google AI Studio)' : '🛡️ 100% Private Local Endpoint Routing'}
+                        {aiProvider === 'gemini' && '☁️ Direct Cloud Routing (Google AI Studio)'}
+                        {aiProvider === 'corporate_gateway' && '🏢 Central Corporate AI Gateway / One API Routing'}
+                        {aiProvider === 'openai_compatible' && '🛡️ 100% Private Local Offline Routing'}
                       </strong>
                       <span style={{ color: 'var(--text-secondary)' }}>
-                        {aiProvider === 'gemini'
-                          ? 'Text is sent over encrypted TLS directly to Google Gemini using your personal API key. Zero intermediate servers touch your text.'
-                          : `Text is sent directly to your endpoint (${customEndpoint || 'localhost'}). If using Ollama or LM Studio, 100% of data remains on your physical machine.`}
+                        {aiProvider === 'gemini' && 'Text is sent over encrypted TLS directly to Google Gemini using your personal API key. Zero intermediate servers touch your text.'}
+                        {aiProvider === 'corporate_gateway' && `Text is routed directly with your corporate bearer token to your organization's centralized One API or LiteLLM gateway (${customEndpoint || 'custom URL'}). Complies with corporate DLP policies.`}
+                        {aiProvider === 'openai_compatible' && `Text is sent directly to your local endpoint (${customEndpoint || 'localhost'}). All computation stays 100% on your physical machine with zero internet transmission.`}
                       </span>
                     </div>
                   </div>
@@ -767,6 +821,133 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
                         {testStatus && !testStatus.loading && (
                           <span style={{ fontSize: '0.78rem', color: testStatus.success ? '#34d399' : '#f87171', fontWeight: 600 }}>
                             {testStatus.message}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Corporate One API Section */}
+                  {aiProvider === 'corporate_gateway' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomEndpoint('https://oneapi.corp.internal/v1');
+                            setCustomModel('gpt-4o');
+                          }}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(139, 92, 246, 0.3)',
+                            background: 'rgba(139, 92, 246, 0.1)',
+                            color: '#a78bfa',
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Preset: One API Gateway
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomEndpoint('https://litellm.corp.internal/v1');
+                            setCustomModel('claude-3-5-sonnet');
+                          }}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(6, 182, 212, 0.3)',
+                            background: 'rgba(6, 182, 212, 0.1)',
+                            color: 'var(--accent-cyan)',
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Preset: LiteLLM Proxy
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomEndpoint('https://ai-proxy.your-company.com/v1');
+                            setCustomModel('gemini-1.5-flash');
+                          }}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            color: 'var(--accent-emerald)',
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Preset: Internal Corp Proxy
+                        </button>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Corporate One API / Gateway URL</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="https://oneapi.your-company.com/v1"
+                          disabled={isLocked}
+                          value={customEndpoint}
+                          onChange={(e) => setCustomEndpoint(e.target.value)}
+                          style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', opacity: isLocked ? 0.75 : 1, cursor: isLocked ? 'not-allowed' : 'text' }}
+                        />
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          Standard OpenAI-compatible base URL of your company's One API or LiteLLM gateway.
+                        </span>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Corporate Model Identifier</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="gpt-4o, claude-3-5-sonnet, gemini-1.5-flash, deepseek-chat, qwen2.5-72b..."
+                          disabled={isLocked}
+                          value={customModel}
+                          onChange={(e) => setCustomModel(e.target.value)}
+                          style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', opacity: isLocked ? 0.75 : 1, cursor: isLocked ? 'not-allowed' : 'text' }}
+                        />
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          Target model name configured on your corporate gateway (e.g. gpt-4o, claude-3-5-sonnet, gemini-1.5-flash).
+                        </span>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Corporate Access Token / Bearer Key</label>
+                        <input
+                          type="password"
+                          className="form-input"
+                          placeholder={isLocked && enterprisePolicy.hasCustomApiKey ? '•••••••••••••••• (Managed by Corporate IT Policy)' : 'sk-... (Corporate token issued by One API / IT)'}
+                          disabled={isLocked}
+                          value={customApiKey}
+                          onChange={(e) => setCustomApiKey(e.target.value)}
+                          style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', opacity: isLocked ? 0.75 : 1, cursor: isLocked ? 'not-allowed' : 'text' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <button
+                          type="button"
+                          className="preset-chip"
+                          onClick={handleTestCustomEndpoint}
+                          disabled={endpointTestStatus?.loading}
+                          style={{ padding: '6px 14px', fontSize: '0.78rem' }}
+                        >
+                          {endpointTestStatus?.loading ? 'Testing Corporate Gateway...' : 'Test Corporate Connection'}
+                        </button>
+                        {endpointTestStatus && (
+                          <span style={{ fontSize: '0.78rem', color: endpointTestStatus.success ? '#34d399' : '#f87171', fontWeight: 600 }}>
+                            {endpointTestStatus.message}
                           </span>
                         )}
                       </div>

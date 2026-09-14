@@ -151,8 +151,8 @@ const DEFAULT_SETTINGS = {
   explainHotkey: 'CommandOrControl+Alt+J',
   theme: 'dark', // 'dark' | 'light'
   preferredLanguages: ['uk', 'en', 'es', 'ru', 'de', 'fr', 'pl'],
-  // BYOM (Bring Your Own Model) Settings
-  aiProvider: 'gemini', // 'gemini' | 'openai_compatible'
+  // BYOM & Corporate AI Gateway Settings
+  aiProvider: 'gemini', // 'gemini' | 'corporate_gateway' | 'openai_compatible'
   customGeminiModel: '',
   customEndpoint: 'http://localhost:11434/v1',
   customApiKey: '',

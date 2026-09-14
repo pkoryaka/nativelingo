@@ -30,22 +30,36 @@ C:\ProgramData\NativeLingo\policy.json
 
 ### Configuration Examples
 
-#### Scenario A: Internal Corporate Proxy or Private LLM (Azure OpenAI / vLLM / Ollama)
+#### Scenario A: Central Corporate "One API" or LiteLLM Proxy Gateway
 ```json
 {
   "organizationName": "Acme Global Corp",
   "licenseKey": "NL-TEAM-ACME-2026-X88F",
   "lockSettings": true,
+  "aiProvider": "corporate_gateway",
+  "customEndpoint": "https://oneapi.corp.acme.com/v1",
+  "customApiKey": "sk-corp-oneapi-master-token",
+  "customModel": "gpt-4o",
+  "primaryTargetLanguage": "en",
+  "disableHistory": true
+}
+```
+
+#### Scenario B: Local Offline LLM (Ollama / LM Studio)
+```json
+{
+  "organizationName": "Acme R&D Lab",
+  "licenseKey": "NL-TEAM-ACME-2026-X88F",
+  "lockSettings": true,
   "aiProvider": "openai_compatible",
-  "customEndpoint": "https://ai-proxy.corp.acme.com/v1",
-  "customApiKey": "corp-internal-secret-token",
+  "customEndpoint": "http://localhost:11434/v1",
   "customModel": "llama3.3-70b-instruct",
   "primaryTargetLanguage": "en",
   "disableHistory": true
 }
 ```
 
-#### Scenario B: Corporate Google Cloud Gemini Enterprise Key
+#### Scenario C: Corporate Google Cloud Gemini Enterprise Key
 ```json
 {
   "organizationName": "Contoso Consulting",
@@ -68,10 +82,10 @@ C:\ProgramData\NativeLingo\policy.json
 | `organizationName` | `string` | **Yes** | Displays company branding in the UI header and Settings dialog (e.g. `🏢 Acme Global Corp`). |
 | `licenseKey` | `string` | Optional | Corporate Team License key. Auto-activates all seats without prompting employees. |
 | `lockSettings` | `boolean` | Optional | When `true`, disables user UI inputs for AI provider, endpoints, model names, and API keys. |
-| `aiProvider` | `string` | **Yes** | Either `"openai_compatible"` (for internal proxies/Ollama/Azure) or `"gemini"`. |
-| `customEndpoint` | `string` | For BYOM | Base OpenAI-compatible URL (e.g. `https://ai.internal.net/v1` or `http://localhost:11434/v1`). |
-| `customApiKey` | `string` | Optional | Bearer authentication token for internal corporate proxy. Automatically masked in the UI. |
-| `customModel` | `string` | For BYOM | Target model ID (e.g. `llama3.3-70b-instruct`, `gpt-4o-mini`, `deepseek-r1`). |
+| `aiProvider` | `string` | **Yes** | `"corporate_gateway"` (Central One API / LiteLLM Proxy), `"openai_compatible"` (Local LLM), or `"gemini"`. |
+| `customEndpoint` | `string` | For Gateway/BYOM | Base OpenAI-compatible URL (e.g. `https://oneapi.corp.com/v1` or `http://localhost:11434/v1`). |
+| `customApiKey` | `string` | Optional | Bearer authentication token for corporate One API gateway. Automatically masked in the UI. |
+| `customModel` | `string` | For Gateway/BYOM | Target model ID (e.g. `gpt-4o`, `claude-3-5-sonnet`, `llama3.3-70b-instruct`, `deepseek-chat`). |
 | `apiKey` | `string` | For Gemini | Corporate Google Cloud Gemini API Key. |
 | `model` | `string` | For Gemini | Gemini model identifier (default: `gemini-flash-lite-latest`). |
 | `disableHistory` | `boolean` | Optional | **Data Loss Prevention (DLP):** If `true`, translation history is never persisted to disk. |

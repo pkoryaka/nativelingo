@@ -6,6 +6,7 @@ import appLogo from '../assets/app-icon.png';
 
 export function Header({ currentModel, onOpenSettings, onOpenHistory, hasApiKey, theme, onToggleTheme }) {
   const settings = storageService.getSettings();
+  const isCorporate = settings.aiProvider === 'corporate_gateway';
   const isLocalAi = settings.aiProvider === 'openai_compatible';
   const [license, setLicense] = useState(() => licenseService.getLicenseState());
 
@@ -114,14 +115,34 @@ export function Header({ currentModel, onOpenSettings, onOpenHistory, hasApiKey,
         <button
           type="button"
           onClick={onOpenSettings}
-          title={isLocalAi ? "Routing: 100% Private Local AI (Ollama/LM Studio)" : "Routing: Google Gemini Direct Cloud"}
+          title={
+            isCorporate
+              ? "Routing: Central Corporate AI Gateway (One API / LiteLLM Proxy)"
+              : isLocalAi
+                ? "Routing: 100% Private Local AI (Ollama/LM Studio)"
+                : "Routing: Google Gemini Direct Cloud"
+          }
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '5px',
-            background: isLocalAi ? 'rgba(16, 185, 129, 0.12)' : 'rgba(99, 102, 241, 0.12)',
-            border: `1px solid ${isLocalAi ? 'rgba(16, 185, 129, 0.3)' : 'rgba(99, 102, 241, 0.3)'}`,
-            color: isLocalAi ? '#10b981' : 'var(--primary)',
+            background: isCorporate
+              ? 'rgba(139, 92, 246, 0.15)'
+              : isLocalAi
+                ? 'rgba(16, 185, 129, 0.12)'
+                : 'rgba(99, 102, 241, 0.12)',
+            border: `1px solid ${
+              isCorporate
+                ? 'rgba(139, 92, 246, 0.35)'
+                : isLocalAi
+                  ? 'rgba(16, 185, 129, 0.3)'
+                  : 'rgba(99, 102, 241, 0.3)'
+            }`,
+            color: isCorporate
+              ? '#a78bfa'
+              : isLocalAi
+                ? '#10b981'
+                : 'var(--primary)',
             padding: '4px 9px',
             borderRadius: '999px',
             fontSize: '0.72rem',
@@ -129,8 +150,22 @@ export function Header({ currentModel, onOpenSettings, onOpenHistory, hasApiKey,
             cursor: 'pointer'
           }}
         >
-          {isLocalAi ? <ShieldCheck size={13} /> : <Cloud size={13} />}
-          <span>{isLocalAi ? 'Local AI' : 'Cloud Direct'}</span>
+          {isCorporate ? (
+            <>
+              <Building2 size={13} />
+              <span>Corporate One API</span>
+            </>
+          ) : isLocalAi ? (
+            <>
+              <ShieldCheck size={13} />
+              <span>Local AI</span>
+            </>
+          ) : (
+            <>
+              <Cloud size={13} />
+              <span>Cloud Direct</span>
+            </>
+          )}
         </button>
 
         <button 

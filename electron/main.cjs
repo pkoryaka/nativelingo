@@ -766,17 +766,20 @@ function triggerGlobalSelectionTranslation(explainJargon = false) {
 }
 
 async function runAiGeneration({ text, systemInstructionText, isJson = false, maxTokens = 1024, model, apiKey }) {
-  if (savedAiProvider === 'openai_compatible') {
+  const isBYOM = savedAiProvider === 'corporate_gateway' || savedAiProvider === 'openai_compatible';
+  if (isBYOM) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const baseUrl = (savedCustomEndpoint || 'http://localhost:11434/v1').replace(/\/+$/, '');
+      const defaultEndpoint = savedAiProvider === 'corporate_gateway' ? 'https://oneapi.corp.internal/v1' : 'http://localhost:11434/v1';
+      const baseUrl = (savedCustomEndpoint || defaultEndpoint).replace(/\/+$/, '');
       const endpoint = `${baseUrl}/chat/completions`;
-      const bearer = savedCustomApiKey ? `Bearer ${savedCustomApiKey.trim()}` : 'Bearer ollama';
+      const bearer = savedCustomApiKey ? `Bearer ${savedCustomApiKey.trim()}` : (savedAiProvider === 'corporate_gateway' ? '' : 'Bearer ollama');
 
+      const defaultModel = savedAiProvider === 'corporate_gateway' ? 'gpt-4o' : 'llama3.2';
       const payload = {
-        model: savedCustomModel || 'llama3.2',
+        model: savedCustomModel || model || defaultModel,
         messages: [
           { role: 'system', content: systemInstructionText },
           { role: 'user', content: text }
@@ -786,12 +789,12 @@ async function runAiGeneration({ text, systemInstructionText, isJson = false, ma
         ...(isJson ? { response_format: { type: 'json_object' } } : {})
       };
 
+      const headers = { 'Content-Type': 'application/json' };
+      if (bearer) headers['Authorization'] = bearer;
+
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': bearer
-        },
+        headers,
         signal: controller.signal,
         body: JSON.stringify(payload)
       });
@@ -799,7 +802,7 @@ async function runAiGeneration({ text, systemInstructionText, isJson = false, ma
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        throw new Error(err.error?.message || `Endpoint returned HTTP ${response.status}`);
+        throw new Error(err.error?.message || `Gateway returned HTTP ${response.status}`);
       }
 
       const data = await response.json();
@@ -1235,12 +1238,100 @@ ipcMain.handle('native:translate', async (event, { apiKey, text, targetLang, cus
     ? `You are a precision text transformer. Follow this user instruction precisely: "${prompt}". Keep the original language unless the instruction explicitly specifies a different language. Output ONLY the transformed text directly without conversational preamble, introduction, markdown commentary, or quotes.`
     : `Translate into ${targetLang}. Output direct translation only without quotes, preamble, or commentary.`;
 
-  const key = (apiKey && apiKey.trim()) || savedApiKey;
+  const isBYOM = savedAiProvider === 'corporate_gateway' || savedAiProvider === 'openai_compatible';
+  const key = isBYOM ? (savedCustomApiKey || apiKey || '') : ((apiKey && apiKey.trim()) || savedApiKey);
   const targetModel = (savedAiProvider === 'gemini')
     ? (savedCustomGeminiModel || model || savedModel || 'gemini-flash-lite-latest')
-    : (model || savedModel || 'gemini-flash-lite-latest');
+    : (savedCustomModel || model || (savedAiProvider === 'corporate_gateway' ? 'gpt-4o' : 'llama3.2'));
 
-  // Ultra-fast streaming path in Node.js: bypasses Chromium renderer throttling
+  // Ultra-fast streaming path in Node.js for One API / BYOM: bypasses Chromium renderer throttling
+  if (!isExplain && isBYOM) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    let accumulatedText = '';
+
+    try {
+      const defaultEndpoint = savedAiProvider === 'corporate_gateway' ? 'https://oneapi.corp.internal/v1' : 'http://localhost:11434/v1';
+      const baseUrl = (savedCustomEndpoint || defaultEndpoint).replace(/\/+$/, '');
+      const endpoint = `${baseUrl}/chat/completions`;
+      const bearer = savedCustomApiKey ? `Bearer ${savedCustomApiKey.trim()}` : (savedAiProvider === 'corporate_gateway' ? '' : 'Bearer ollama');
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (bearer) headers['Authorization'] = bearer;
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: targetModel,
+          messages: [
+            { role: 'system', content: systemInstructionText },
+            { role: 'user', content: text }
+          ],
+          temperature: 0.1,
+          stream: true,
+          max_tokens: Math.max(128, Math.min(1024, text.length * 3))
+        })
+      });
+      clearTimeout(timeoutId);
+
+      if (response.ok && response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        let isDone = false;
+
+        while (!isDone) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split(/\r?\n/);
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data:')) {
+              const jsonStr = trimmed.replace(/^data:\s*/, '').trim();
+              if (jsonStr === '[DONE]') {
+                isDone = true;
+                break;
+              }
+              if (jsonStr) {
+                try {
+                  const parsed = JSON.parse(jsonStr);
+                  const chunk = parsed.choices?.[0]?.delta?.content || '';
+                  if (chunk) {
+                    accumulatedText += chunk;
+                    event.sender.send('quick-translate-chunk', accumulatedText);
+                  }
+                  if (parsed.choices?.[0]?.finish_reason) {
+                    isDone = true;
+                    break;
+                  }
+                } catch {}
+              }
+            }
+          }
+        }
+        try { reader.cancel(); } catch {}
+
+        if (accumulatedText && accumulatedText.trim()) {
+          return { success: true, rawOutput: accumulatedText.trim() };
+        }
+      }
+    } catch (streamErr) {
+      console.warn('One API / BYOM streaming notice, checking accumulated buffer:', streamErr.message);
+      if (accumulatedText && accumulatedText.trim()) {
+        return { success: true, rawOutput: accumulatedText.trim() };
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  // Ultra-fast streaming path in Node.js for Google Gemini: bypasses Chromium renderer throttling
   if (!isExplain && savedAiProvider === 'gemini' && key) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 12000);
@@ -1346,16 +1437,23 @@ ipcMain.handle('models:fetch', async (event, apiKey) => {
 });
 
 ipcMain.handle('endpoint:test', async (event, { endpoint, model, apiKey }) => {
-  const url = `${(endpoint || 'http://localhost:11434/v1').replace(/\/+$/, '')}/chat/completions`;
+  const defaultUrl = (endpoint && !endpoint.includes('localhost')) ? endpoint : (endpoint || 'http://localhost:11434/v1');
+  const url = `${defaultUrl.replace(/\/+$/, '')}/chat/completions`;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 6000);
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const startTime = Date.now();
+
   try {
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    if (apiKey && apiKey.trim()) {
+      headers['Authorization'] = `Bearer ${apiKey.trim()}`;
+    }
+
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey || 'ollama'}`
-      },
+      headers,
       signal: controller.signal,
       body: JSON.stringify({
         model: model || 'llama3.2',
@@ -1364,15 +1462,19 @@ ipcMain.handle('endpoint:test', async (event, { endpoint, model, apiKey }) => {
       })
     });
     clearTimeout(timeoutId);
+    const latency = Date.now() - startTime;
+
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      throw new Error(err.error?.message || `HTTP ${response.status}`);
+      const msg = err.error?.message || `HTTP ${response.status} ${response.statusText}`;
+      return { success: false, text: `Gateway error (${response.status}): ${msg}` };
     }
     const data = await response.json();
-    return { success: true, text: data.choices?.[0]?.message?.content || 'OK' };
+    const reply = data.choices?.[0]?.message?.content?.trim() || 'OK';
+    return { success: true, text: `✓ Connected (${latency}ms) — Model "${model || 'default'}" verified: "${reply}"` };
   } catch (err) {
     clearTimeout(timeoutId);
-    throw err;
+    return { success: false, text: `Connection failed: ${err.message}` };
   }
 });
 

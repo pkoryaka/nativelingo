@@ -145,7 +145,7 @@ Each named user license permits installation on up to **2 workstations** used ex
 ## 5. Licensing Support & Inquiries
 
 For seat expansions, invoice requests, or procurement assistance:
-- **Commercial Licensing Portal**: [https://businessintel.co.site](https://businessintel.co.site)
-- **Corporate Procurement & Invoices**: `licensing@businessintel.co.site`
-- **Technical Deployment Inquiries**: `support@businessintel.co.site`
+- **Commercial Licensing Portal**: [https://businessintelsystem.com](https://businessintelsystem.com)
+- **Corporate Procurement & Invoices**: `licensing@businessintelsystem.com`
+- **Technical Deployment Inquiries**: `support@businessintelsystem.com`
 

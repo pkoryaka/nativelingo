@@ -180,7 +180,7 @@ To enforce policy via Active Directory Group Policy Objects:
 
 Under the [NativeLingo EULA (LICENSE.md)](./LICENSE.md), commercial entities with greater than 1 commercial user are required to obtain a **Multi-User Team License** ($24/seat/year) or **Single-User Commercial License** ($17/year or $29 perpetual) after a 40-day evaluation.
 
-- **Purchase & Invoicing:** Contact `licensing@businessintel.co.site`.
+- **Purchase & Invoicing:** Contact `licensing@businessintelsystem.com`.
 - **Tax/VAT Receipts:** Lemon Squeezy and Stripe provide automatic tax compliance, VAT reverse charges, and formal PDF corporate receipts.
 - **Offline License Key Delivery:** Multi-seat offline Ed25519 keys (`NL1-...`) can be issued for strictly air-gapped corporate environments.
 

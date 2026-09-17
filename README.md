@@ -155,4 +155,4 @@ npm run build
 ## 📜 License & Support
 * **Personal & Educational Use**: 100% Free Forever under Section 3 of the [NativeLingo EULA](./LICENSE).
 * **Commercial & Workplace Deployment**: 40-day evaluation, followed by commercial licensing. See [`PRICING.md`](./PRICING.md) and [`CLIENT_LICENSING.md`](./CLIENT_LICENSING.md).
-* **Enterprise & Corporate Licensing**: Contact `licensing@businessintel.co.site`.
+* **Enterprise & Corporate Licensing**: Contact `licensing@businessintelsystem.com`.

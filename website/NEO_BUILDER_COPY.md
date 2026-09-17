@@ -62,19 +62,19 @@ If you decide to use **Neo’s visual site builder** inside `https://admin.neo.s
 - **Price**: `$17 / year` ($1.42/month)
 - **Target**: Freelancers, solo consultants & remote professionals
 - **Includes**: 1 named user, 2 workstations (desktop + laptop), all updates during term, commercial VAT/tax receipts, priority corporate support.
-- **Button**: `Order Annual ($17)` ➔ `mailto:licensing@businessintel.co.site?subject=Order%20Annual%20License%20($17)`
+- **Button**: `Order Annual ($17)` ➔ `mailto:licensing@businessintelsystem.com?subject=Order%20Annual%20License%20($17)`
 
 ### Tier 3: Single-User Perpetual
 - **Price**: `$29 one-time` (Launch Deal, regular $37)
 - **Target**: Users who prefer to own their software forever
 - **Includes**: Own your version forever, 12 months version updates included, 2 workstations, optional renewal at $12/yr, cryptographic Ed25519 offline key.
-- **Button**: `Get Perpetual ($29)` ➔ `mailto:licensing@businessintel.co.site?subject=Order%20Perpetual%20License%20($29)`
+- **Button**: `Get Perpetual ($29)` ➔ `mailto:licensing@businessintelsystem.com?subject=Order%20Perpetual%20License%20($29)`
 
 ### Tier 4: Multi-User Team
 - **Price**: `$24 / seat / year` (Minimum 3 seats: $72/yr)
 - **Target**: Consultancies, agencies, engineering departments
 - **Includes**: Central Group Policy (`policy.json`) deployment, Intune scripts, reassignable employee seats, corporate VAT invoice & Wire/ACH support, dedicated SLA.
-- **Button**: `Order Team ($24/seat)` ➔ `mailto:licensing@businessintel.co.site?subject=Order%20Corporate%20Team%20License%20($24/seat)`
+- **Button**: `Order Team ($24/seat)` ➔ `mailto:licensing@businessintelsystem.com?subject=Order%20Corporate%20Team%20License%20($24/seat)`
 
 ---
 
@@ -83,5 +83,5 @@ If you decide to use **Neo’s visual site builder** inside `https://admin.neo.s
 - **Q: Does NativeLingo transmit clipboard data to your servers?**
   **A**: No. NativeLingo has zero proprietary proxy servers, zero telemetry collectors, and zero user tracking. Text travels strictly between your PC and your chosen LLM endpoint over point-to-point TLS.
 - **Q: How do we receive corporate invoices?**
-  **A**: Email `licensing@businessintel.co.site` with your company VAT/Tax details. We issue formal PDF invoices with reverse-charge VAT compliance.
-- **Contact Email**: `licensing@businessintel.co.site` or `support@businessintel.co.site`
+  **A**: Email `licensing@businessintelsystem.com` with your company VAT/Tax details. We issue formal PDF invoices with reverse-charge VAT compliance.
+- **Contact Email**: `licensing@businessintelsystem.com` or `support@businessintelsystem.com`

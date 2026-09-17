@@ -408,21 +408,21 @@ export function SettingsModal({ isOpen, onClose, onSettingsUpdated, theme: initi
 - Plan: Commercial Single-User Annual ($17 / year)
 - Workstations: 2 PCs included
 - Updates & Priority Support: Included
-- Contact / Send to: licensing@businessintel.co.site
+- Contact / Send to: licensing@businessintelsystem.com
 - Please send invoice & payment instructions.`;
     } else if (tierKey === 'perpetual') {
       details = `NativeLingo Commercial License Order Request:
 - Plan: Commercial Single-User Perpetual ($29 one-time launch deal)
 - Workstations: 2 PCs included
 - 12 Months Version Updates & Perpetual Right: Included
-- Contact / Send to: licensing@businessintel.co.site
+- Contact / Send to: licensing@businessintelsystem.com
 - Please send invoice & payment instructions.`;
     } else {
       details = `NativeLingo Commercial License Order Request:
 - Plan: Commercial Multi-User Team ($24 / seat / year)
 - Seats: 3 Seats Minimum ($72 / year)
 - Cryptographic Offline Keys & Central Management: Included
-- Contact / Send to: licensing@businessintel.co.site
+- Contact / Send to: licensing@businessintelsystem.com
 - Please send corporate tax invoice & wire/ACH instructions.`;
     }
 
@@ -450,7 +450,7 @@ Number of Seats / Workstations:
 Preferred Payment Method: Credit Card / Corporate Invoice / Wire
 
 Thank you!`);
-    const mailUrl = `mailto:licensing@businessintel.co.site?subject=${subject}&body=${body}`;
+    const mailUrl = `mailto:licensing@businessintelsystem.com?subject=${subject}&body=${body}`;
     if (window.electronAPI?.openExternal) {
       window.electronAPI.openExternal(mailUrl);
     } else {

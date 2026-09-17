@@ -1,6 +1,6 @@
 /**
  * NativeLingo Website Interactive Simulator & Order Modal
- * Target: businessintel.co.site
+ * Target: businessintelsystem.com
  */
 
 const SCENARIOS = {
@@ -124,7 +124,7 @@ function openOrderModal(tierKey) {
   if (tierKey === 'annual') {
     title = 'Single-User Annual ($17 / year)';
     desc = 'Includes 2 workstations, 1 named user, all version updates, and priority corporate support.';
-    orderTemplate = `To: licensing@businessintel.co.site
+    orderTemplate = `To: licensing@businessintelsystem.com
 Subject: Order Request: NativeLingo Commercial Single-User Annual ($17/yr)
 
 Company / Organization: [Your Company Name]
@@ -138,7 +138,7 @@ Please send commercial invoice & license activation token (NL1-...).`;
   } else if (tierKey === 'perpetual') {
     title = 'Single-User Perpetual ($29 one-time)';
     desc = 'Own your version license forever. Includes 12 months of version updates and 2 workstations.';
-    orderTemplate = `To: licensing@businessintel.co.site
+    orderTemplate = `To: licensing@businessintelsystem.com
 Subject: Order Request: NativeLingo Single-User Perpetual ($29 Launch Deal)
 
 Company / Organization: [Your Company Name]
@@ -152,7 +152,7 @@ Please send commercial invoice & lifetime offline license token (NL1-...).`;
   } else {
     title = 'Multi-User Team ($24 / seat / year)';
     desc = 'Centralized Group Policy deployment, minimum 3 seats ($72/yr), corporate VAT receipts & SLA.';
-    orderTemplate = `To: licensing@businessintel.co.site
+    orderTemplate = `To: licensing@businessintelsystem.com
 Subject: Order Request: NativeLingo Multi-User Team Deployment ($24/seat/yr)
 
 Company / Organization: [Your Corporate Name]
@@ -170,7 +170,7 @@ Please send formal corporate proforma invoice and central policy deployment guid
   if (modalTierDesc) modalTierDesc.innerText = desc;
   if (modalOrderText) modalOrderText.innerText = orderTemplate;
 
-  const mailtoUrl = `mailto:licensing@businessintel.co.site?subject=${emailSubject}&body=${encodeURIComponent(orderTemplate)}`;
+  const mailtoUrl = `mailto:licensing@businessintelsystem.com?subject=${emailSubject}&body=${encodeURIComponent(orderTemplate)}`;
   if (btnModalEmail) {
     btnModalEmail.href = mailtoUrl;
   }

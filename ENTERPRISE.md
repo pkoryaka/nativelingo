@@ -105,8 +105,8 @@ Administrators can deploy NativeLingo silently and write the enterprise policy u
 
 $ErrorActionPreference = "Stop"
 
-$InstallerUrl = "https://github.com/pkoryaka/nativelingo/releases/latest/download/NativeLingo-Setup.exe"
-$TempInstaller = "$env:TEMP\NativeLingo-Setup.exe"
+$InstallerUrl = "https://github.com/pkoryaka/nativelingo/releases/latest/download/NativeLingo.Setup.1.0.0.exe"
+$TempInstaller = "$env:TEMP\NativeLingo.Setup.1.0.0.exe"
 $PolicyDir     = "C:\ProgramData\NativeLingo"
 $PolicyFile    = "$PolicyDir\policy.json"
 

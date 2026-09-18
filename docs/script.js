@@ -175,6 +175,18 @@ Please send formal corporate proforma invoice and central policy deployment guid
     btnModalEmail.href = mailtoUrl;
   }
 
+  const modalStripeContainer = document.getElementById('modal-stripe-container');
+  const btnModalStripe = document.getElementById('btn-modal-stripe');
+  if (modalStripeContainer && btnModalStripe) {
+    if (tierKey === 'annual') {
+      modalStripeContainer.style.display = 'block';
+      btnModalStripe.href = 'https://buy.stripe.com/test_14A8wO7o0cuL5sM7rDeUU00';
+      btnModalStripe.innerText = '💳 Pay Instantly with Card / Apple Pay ($17)';
+    } else {
+      modalStripeContainer.style.display = 'none';
+    }
+  }
+
   if (orderModal) {
     orderModal.style.display = 'flex';
   }

@@ -2520,6 +2520,40 @@ Thank you!`);
                           </p>
 
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                            {/* Option 0: Live Stripe Checkout */}
+                            {selectedTier === 'annual' && (
+                              <button
+                                type="button"
+                                className="btn-primary"
+                                onClick={() => {
+                                  const url = 'https://buy.stripe.com/test_14A8wO7o0cuL5sM7rDeUU00';
+                                  if (window.electronAPI?.openExternal) {
+                                    window.electronAPI.openExternal(url);
+                                  } else {
+                                    window.open(url, '_blank');
+                                  }
+                                }}
+                                style={{
+                                  padding: '10px 14px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '8px',
+                                  fontSize: '0.82rem',
+                                  fontWeight: 700,
+                                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  gridColumn: '1 / -1',
+                                  borderRadius: '6px',
+                                  boxShadow: '0 2px 8px rgba(99, 102, 241, 0.3)'
+                                }}
+                              >
+                                <CreditCard size={15} />
+                                <span>💳 Instant Purchase with Card / Apple Pay ($17)</span>
+                              </button>
+                            )}
+
                             {/* Option 1: Instant Demo Evaluation */}
                             <button
                               type="button"

@@ -381,7 +381,12 @@ export function App() {
         targetLang={targetLang}
         setTargetLang={setTargetLang}
         explainJargon={explainJargon}
-        setExplainJargon={setExplainJargon}
+        setExplainJargon={(val) => {
+          setExplainJargon(val);
+          if (!val) {
+            setExplanationData(null);
+          }
+        }}
       />
 
       {/* Translation Style / Custom Prompt Bar */}
@@ -406,7 +411,10 @@ export function App() {
 
       {/* Jargon & Plain Language Explanation Card (rendered if available) */}
       {explanationData && (
-        <JargonExplainerCard explanationData={explanationData} />
+        <JargonExplainerCard
+          explanationData={explanationData}
+          onClose={() => setExplanationData(null)}
+        />
       )}
 
       {/* Settings Modal */}

@@ -1,7 +1,7 @@
 import React from 'react';
-import { HelpCircle, Info, Sparkles, Tag, Globe2, BookOpen } from 'lucide-react';
+import { HelpCircle, Info, Sparkles, Tag, Globe2, BookOpen, X } from 'lucide-react';
 
-export function JargonExplainerCard({ explanationData }) {
+export function JargonExplainerCard({ explanationData, onClose }) {
   if (!explanationData) return null;
 
   const {
@@ -25,12 +25,26 @@ export function JargonExplainerCard({ explanationData }) {
           )}
         </div>
 
-        {detectedTone && (
-          <div className="tone-badge" title="Detected tone of the original message">
-            <Sparkles size={13} />
-            <span>Tone: {detectedTone}</span>
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {detectedTone && (
+            <div className="tone-badge" title="Detected tone of the original message">
+              <Sparkles size={13} />
+              <span>Tone: {detectedTone}</span>
+            </div>
+          )}
+          {onClose && (
+            <button
+              type="button"
+              className="btn-icon"
+              onClick={onClose}
+              title="Close Explanation Card"
+              aria-label="Close"
+              style={{ width: '28px', height: '28px', padding: 0, cursor: 'pointer' }}
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Plain Language Meaning Box */}

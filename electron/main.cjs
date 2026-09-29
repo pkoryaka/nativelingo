@@ -10,6 +10,7 @@ if (!gotTheLock) {
   process.exit(0);
 } else {
   app.on('second-instance', () => {
+    debugLog('second-instance event triggered! Restoring and focusing mainWindow');
     if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
@@ -24,11 +25,33 @@ if (!gotTheLock) {
   });
 }
 
+function debugLog(msg) {
+  try {
+    fs.appendFileSync(path.join(__dirname, '..', 'crash_debug.log'), `[${new Date().toISOString()}] ${msg}\n`, 'utf8');
+  } catch {}
+}
+
+debugLog('main.cjs started. PID: ' + process.pid + ', argv: ' + JSON.stringify(process.argv));
+
 process.on('uncaughtException', (err) => {
+  debugLog('Uncaught Exception: ' + (err?.stack || err));
   console.error('Uncaught Exception:', err);
 });
 process.on('unhandledRejection', (reason) => {
+  debugLog('Unhandled Rejection: ' + (reason?.stack || reason));
   console.error('Unhandled Rejection:', reason);
+});
+process.on('exit', (code) => {
+  debugLog('Process exit with code: ' + code);
+});
+app.on('before-quit', (e) => {
+  debugLog('app before-quit. isQuitting: ' + isQuitting);
+});
+app.on('will-quit', () => {
+  debugLog('app will-quit');
+});
+app.on('quit', (e, exitCode) => {
+  debugLog('app quit with exitCode: ' + exitCode);
 });
 
 // Chromium Performance & Responsiveness flags for background utility app
@@ -495,11 +518,13 @@ function getAppIcon() {
 }
 
 function createWindow() {
+  debugLog('createWindow called. argv: ' + JSON.stringify(process.argv));
   const icon = getAppIcon();
   const isHiddenArg = process.argv.some(arg => 
     typeof arg === 'string' && (arg.includes('hidden') || arg.includes('minimized'))
   );
   const shouldStartHidden = isHiddenArg;
+  debugLog('createWindow shouldStartHidden: ' + shouldStartHidden);
 
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -522,11 +547,13 @@ function createWindow() {
   });
 
   if (!shouldStartHidden) {
+    debugLog('createWindow: calling mainWindow.show() and focus()');
     mainWindow.show();
     mainWindow.focus();
   }
 
   mainWindow.once('ready-to-show', () => {
+    debugLog('mainWindow ready-to-show event fired. isVisible: ' + mainWindow?.isVisible());
     if (!shouldStartHidden && mainWindow && !mainWindow.isVisible()) {
       mainWindow.show();
       mainWindow.focus();
@@ -543,21 +570,26 @@ function createWindow() {
 
   const distHtml = path.join(__dirname, '../dist/index.html');
   mainWindow.webContents.on('did-fail-load', (e, errorCode, errorDescription) => {
+    debugLog('mainWindow failed to load: ' + errorCode + ' ' + errorDescription);
     console.error('mainWindow failed to load:', errorCode, errorDescription);
   });
   mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
     console.log(`[Renderer] [${level}] ${message} (${sourceId}:${line})`);
   });
   mainWindow.webContents.on('did-finish-load', () => {
+    debugLog('mainWindow did-finish-load successfully');
     console.log('[Main] Renderer finished loading successfully!');
   });
   mainWindow.webContents.on('render-process-gone', (event, details) => {
+    debugLog('mainWindow render-process-gone: ' + JSON.stringify(details));
     console.error('[Main] Renderer process gone:', details);
   });
 
   if (fs.existsSync(distHtml) && process.env.VITE_DEV !== 'true') {
+    debugLog('Loading file: ' + distHtml);
     mainWindow.loadFile(distHtml);
   } else {
+    debugLog('Loading URL: http://localhost:5173');
     mainWindow.loadURL('http://localhost:5173');
   }
 
@@ -1378,6 +1410,7 @@ function registerGlobalHotkeys(newTranslateKey, newExplainKey, newSlots) {
 
 
 app.whenReady().then(() => {
+  debugLog('app.whenReady resolved');
   cleanRogueRegistryEntries();
   loadSavedConfig();
   createWindow();

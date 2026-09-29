@@ -3,28 +3,20 @@ strPath = fso.GetParentFolderName(WScript.ScriptFullName)
 Set WshShell = CreateObject("WScript.Shell")
 WshShell.CurrentDirectory = strPath
 
-electronExe = strPath & "\node_modules\electron\dist\electron.exe"
-
 args = ""
-isHidden = False
 If WScript.Arguments.Count > 0 Then
   For i = 0 To WScript.Arguments.Count - 1
     args = args & " """ & WScript.Arguments(i) & """"
-    If InStr(LCase(WScript.Arguments(i)), "hidden") > 0 Or InStr(LCase(WScript.Arguments(i)), "minimized") > 0 Then
-      isHidden = True
-    End If
   Next
 End If
 
-windowStyle = 1
-If isHidden Then
-  windowStyle = 0
-End If
+electronExe = strPath & "\node_modules\electron\dist\electron.exe"
 
 If fso.FileExists(electronExe) Then
-  WshShell.Run """" & electronExe & """ ." & args, windowStyle, False
+  cmdLine = "cmd /c """"" & electronExe & """ """ & strPath & """" & args & """"
+  WshShell.Run cmdLine, 0, False
 Else
-  WshShell.Run "cmd /c call """ & strPath & "\start.bat""" & args, windowStyle, False
+  WshShell.Run "cmd /c npm start -- " & args, 0, False
 End If
 
 Set WshShell = Nothing

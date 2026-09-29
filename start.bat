@@ -10,8 +10,7 @@ if not exist "%APP_DIR%\dist\index.html" (
 )
 
 if exist "%APP_DIR%\node_modules\electron\dist\electron.exe" (
-    start "" "%APP_DIR%\node_modules\electron\dist\electron.exe" . %*
+    start "" "node_modules\electron\dist\electron.exe" . %*
 ) else (
     call npm start -- %*
 )
-

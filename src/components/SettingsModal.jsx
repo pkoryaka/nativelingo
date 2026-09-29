@@ -1662,7 +1662,7 @@ Thank you!`);
                       ...quickSlots.filter((s) => s.id !== slot.id).map((s) => s.hotkey)
                     ].filter(Boolean);
 
-                    const defaultKeys = ['CommandOrControl+Alt+1', 'CommandOrControl+Alt+2', 'CommandOrControl+Alt+3'];
+                    const defaultKeys = ['CommandOrControl+Alt+1', 'CommandOrControl+Alt+2', 'CommandOrControl+Alt+3', 'CommandOrControl+Alt+R'];
                     const defKey = defaultKeys[index] || '';
 
                     return (
@@ -1749,6 +1749,16 @@ Thank you!`);
                                 })}
                               >
                                 To English
+                              </button>
+                              <button
+                                type="button"
+                                className="slot-preset-tag"
+                                onClick={() => handleSlotChange(slot.id, {
+                                  name: 'Smart Thread Reply',
+                                  prompt: 'Analyze the highlighted conversation or thread. Identify key context, who said what, and any pending questions or action items. Draft a clear, concise, natural, and helpful reply ready to send in chat. Output ONLY the reply message text ready to send. No quotes, no preamble, and no meta-commentary.'
+                                })}
+                              >
+                                Thread Reply
                               </button>
                             </div>
                           </div>

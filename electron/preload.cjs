@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   copyToClipboard: (text) => ipcRenderer.invoke('clipboard:copy', text),
   readClipboard: () => ipcRenderer.invoke('clipboard:read'),
+  insertReply: (text) => ipcRenderer.invoke('window:insert-reply', text),
   hideToTray: () => ipcRenderer.invoke('window:hide-to-tray'),
   showWindow: () => ipcRenderer.invoke('window:show'),
   setWindowMode: (mode) => ipcRenderer.invoke('window:set-mode', mode),

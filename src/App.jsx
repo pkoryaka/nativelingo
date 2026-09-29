@@ -179,6 +179,15 @@ export function App() {
           setCurrentVariantIndex(0);
         }
 
+        // Auto-copy to clipboard if this was triggered via a Quick Action slot
+        if (effectivePrompt || options.autoCopy) {
+          if (window.electronAPI?.copyToClipboard) {
+            window.electronAPI.copyToClipboard(newTranslation);
+          } else if (navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText(newTranslation).catch(() => {});
+          }
+        }
+
         // Save to History
         if (currentSettings.saveHistory !== false) {
           storageService.addHistoryItem({

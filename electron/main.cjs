@@ -154,7 +154,7 @@ function loadEnterprisePolicy() {
   }
 }
 
-let quickPromptSlots = [
+const DEFAULT_QUICK_SLOTS = [
   {
     id: 1,
     name: 'Fix Grammar & Polish',
@@ -178,8 +178,18 @@ let quickPromptSlots = [
     hotkey: 'CommandOrControl+Alt+3',
     pasteBack: true,
     enabled: true
+  },
+  {
+    id: 4,
+    name: 'Smart Thread Reply',
+    prompt: 'Analyze the highlighted conversation or thread. Identify key context, who said what, and any pending questions or action items. Draft a clear, concise, natural, and helpful reply ready to send in chat. Output ONLY the reply message text ready to send. No quotes, no preamble, and no meta-commentary.',
+    hotkey: 'CommandOrControl+Alt+R',
+    pasteBack: false,
+    enabled: true
   }
 ];
+
+let quickPromptSlots = JSON.parse(JSON.stringify(DEFAULT_QUICK_SLOTS));
 
 function getConfigPath() {
   const userData = app.getPath('userData');
@@ -313,7 +323,14 @@ function loadSavedConfig() {
       if (data.customApiKey) savedCustomApiKey = data.customApiKey;
       if (data.customModel) savedCustomModel = data.customModel;
       if (data.quickPromptSlots && Array.isArray(data.quickPromptSlots)) {
-        quickPromptSlots = data.quickPromptSlots;
+        const existingIds = new Set(data.quickPromptSlots.map(s => s.id));
+        const merged = [...data.quickPromptSlots];
+        DEFAULT_QUICK_SLOTS.forEach(defSlot => {
+          if (!existingIds.has(defSlot.id)) {
+            merged.push({ ...defSlot });
+          }
+        });
+        quickPromptSlots = merged;
       }
     }
 
@@ -1198,6 +1215,19 @@ let lastQuickRewrite = {
 };
 let isProcessingSlot = false;
 
+function triggerPasteNative(pasteMode = 'paste') {
+  if (process.platform !== 'win32') return;
+  const copyExe = path.join(__dirname, 'copy_native.exe');
+  const copyVbs = path.join(__dirname, 'copy.vbs');
+  if (fs.existsSync(copyExe)) {
+    execFile(copyExe, [pasteMode], (err) => {
+      if (err) console.warn(`Native ${pasteMode} execution error:`, err);
+    });
+  } else if (fs.existsSync(copyVbs)) {
+    exec(`wscript.exe "${copyVbs}" ${pasteMode}`);
+  }
+}
+
 // Quick Action Slot Execution (In-place rewrite & paste back OR open HUD)
 function triggerQuickSlotAction(slotId) {
   const slot = (quickPromptSlots || []).find((s) => s.id === slotId);
@@ -1308,13 +1338,7 @@ Output ONLY the transformed text directly without conversational preamble, intro
               const pasteMode = isConsecutiveUndoVariant ? 'undopaste' : 'paste';
 
               setTimeout(() => {
-                if (fs.existsSync(copyExe)) {
-                  execFile(copyExe, [pasteMode], (err) => {
-                    if (err) console.warn(`Native ${pasteMode} execution error:`, err);
-                  });
-                } else if (fs.existsSync(copyVbs)) {
-                  exec(`wscript.exe "${copyVbs}" ${pasteMode}`);
-                }
+                triggerPasteNative(pasteMode);
               }, 10);
             } else {
               if (previousClipboard) {
@@ -1464,6 +1488,20 @@ ipcMain.handle('window:hide-to-tray', () => {
   if (mainWindow) {
     mainWindow.hide();
   }
+  return true;
+});
+
+ipcMain.handle('window:insert-reply', async (event, textToInsert) => {
+  if (textToInsert) {
+    clipboard.writeText(textToInsert);
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.hide();
+  }
+  // When mini window hides, Windows OS returns focus to the previously active application (Slack)
+  setTimeout(() => {
+    triggerPasteNative('paste');
+  }, 90);
   return true;
 });
 

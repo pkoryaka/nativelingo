@@ -161,6 +161,14 @@ export const DEFAULT_QUICK_SLOTS = [
     hotkey: 'CommandOrControl+Alt+3',
     pasteBack: true,
     enabled: true
+  },
+  {
+    id: 4,
+    name: 'Smart Thread Reply',
+    prompt: 'Analyze the highlighted conversation or thread. Identify key context, who said what, and any pending questions or action items. Draft a clear, concise, natural, and helpful reply ready to send in chat. Output ONLY the reply message text ready to send. No quotes, no preamble, and no meta-commentary.',
+    hotkey: 'CommandOrControl+Alt+R',
+    pasteBack: false,
+    enabled: true
   }
 ];
 
@@ -536,10 +544,16 @@ export const storageService = {
       if (!data) return DEFAULT_QUICK_SLOTS;
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return DEFAULT_QUICK_SLOTS.map((defSlot) => {
+        const merged = DEFAULT_QUICK_SLOTS.map((defSlot) => {
           const found = parsed.find((p) => p.id === defSlot.id);
           return found ? { ...defSlot, ...found } : defSlot;
         });
+        parsed.forEach((p) => {
+          if (!merged.some((m) => m.id === p.id)) {
+            merged.push(p);
+          }
+        });
+        return merged;
       }
       return DEFAULT_QUICK_SLOTS;
     } catch {

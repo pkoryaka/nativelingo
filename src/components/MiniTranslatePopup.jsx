@@ -11,7 +11,8 @@ import {
   AlertCircle,
   Settings,
   ShieldCheck,
-  Cloud
+  Cloud,
+  CornerDownLeft
 } from 'lucide-react';
 import { SUPPORTED_LANGUAGES } from '../services/geminiService';
 import { storageService } from '../services/storageService';
@@ -58,6 +59,19 @@ export function MiniTranslatePopup({
       if (onCopy) onCopy();
     } catch (e) {
       console.error('Copy failed', e);
+    }
+  };
+
+  const handleInsert = async () => {
+    if (!translatedText || !translatedText.trim()) return;
+    try {
+      if (window.electronAPI?.insertReply) {
+        await window.electronAPI.insertReply(translatedText);
+      } else {
+        await handleCopy();
+      }
+    } catch (e) {
+      console.error('Insert failed', e);
     }
   };
 
@@ -185,6 +199,32 @@ export function MiniTranslatePopup({
         <div className="mini-header-actions">
           {translatedText && (
             <>
+              <button
+                type="button"
+                className="btn-insert-reply"
+                onClick={handleInsert}
+                title="Paste directly into Slack / active window and close"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  background: 'linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '3px 9px',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(99, 102, 241, 0.35)',
+                  transition: 'all 0.15s ease',
+                  marginRight: '2px'
+                }}
+              >
+                <CornerDownLeft size={12} />
+                <span>Insert</span>
+              </button>
+
               <button
                 type="button"
                 className="btn-icon"

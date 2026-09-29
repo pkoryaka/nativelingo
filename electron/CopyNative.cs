@@ -21,6 +21,7 @@ public class CopyNative {
     private const byte VK_RWIN = 0x5C;
     private const byte VK_C = 0x43;
     private const byte VK_V = 0x56;
+    private const byte VK_Z = 0x5A;
 
     public static void Main(string[] args) {
         if (args.Length > 0 && args[0].ToLower() == "trim") {
@@ -28,7 +29,45 @@ public class CopyNative {
             return;
         }
 
-        bool isPaste = (args.Length > 0 && args[0].ToLower() == "paste");
+        string cmd = (args.Length > 0) ? args[0].ToLower() : "copy";
+
+        if (cmd == "undopaste") {
+            ReleaseModifiers();
+            Thread.Sleep(5);
+
+            // 1. Synthesize Ctrl + Z (Undo)
+            keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
+            Thread.Sleep(10);
+            keybd_event(VK_Z, 0, 0, UIntPtr.Zero);
+            Thread.Sleep(15);
+            keybd_event(VK_Z, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+
+            Thread.Sleep(35);
+
+            // 2. Synthesize Ctrl + V (Paste)
+            keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
+            Thread.Sleep(10);
+            keybd_event(VK_V, 0, 0, UIntPtr.Zero);
+            Thread.Sleep(15);
+            keybd_event(VK_V, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            return;
+        }
+
+        if (cmd == "undo") {
+            ReleaseModifiers();
+            Thread.Sleep(5);
+            keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
+            Thread.Sleep(10);
+            keybd_event(VK_Z, 0, 0, UIntPtr.Zero);
+            Thread.Sleep(15);
+            keybd_event(VK_Z, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            return;
+        }
+
+        bool isPaste = (cmd == "paste");
 
         if (!isPaste) {
             // 1. When capturing (Copy), pause slightly to ensure physical modifier key settling (e.g. user pressing Alt+A)
@@ -36,11 +75,7 @@ public class CopyNative {
         }
 
         // 2. Force release modifier keys
-        keybd_event(VK_SHIFT, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-        keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-        keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-        keybd_event(VK_RWIN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-        keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        ReleaseModifiers();
 
         if (!isPaste) {
             Thread.Sleep(15);
@@ -56,6 +91,14 @@ public class CopyNative {
         keybd_event(targetKey, 0, 0, UIntPtr.Zero);
         Thread.Sleep(isPaste ? 15 : 25);
         keybd_event(targetKey, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+    }
+
+    private static void ReleaseModifiers() {
+        keybd_event(VK_SHIFT, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        keybd_event(VK_RWIN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
         keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
     }
 

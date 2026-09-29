@@ -989,7 +989,7 @@ function triggerGlobalSelectionTranslation(explainJargon = false) {
   }
 }
 
-async function runAiGeneration({ text, systemInstructionText, isJson = false, maxTokens = 1024, model, apiKey, provider }) {
+async function runAiGeneration({ text, systemInstructionText, isJson = false, maxTokens = 1024, model, apiKey, provider, temperature }) {
   const cfg = resolveActiveProviderConfig({ provider, model, apiKey });
 
   if (cfg.provider !== 'openai_compatible' && !cfg.apiKey) {
@@ -998,6 +998,7 @@ async function runAiGeneration({ text, systemInstructionText, isJson = false, ma
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const genTemperature = temperature ?? 0.1;
 
   try {
     if (cfg.protocol === 'anthropic') {
@@ -1007,7 +1008,7 @@ async function runAiGeneration({ text, systemInstructionText, isJson = false, ma
         system: systemInstructionText,
         messages: [{ role: 'user', content: text }],
         max_tokens: maxTokens,
-        temperature: 0.1
+        temperature: genTemperature
       };
 
       const response = await fetch(endpoint, {
@@ -1044,7 +1045,7 @@ async function runAiGeneration({ text, systemInstructionText, isJson = false, ma
           { role: 'system', content: systemInstructionText },
           { role: 'user', content: text }
         ],
-        temperature: 0.1,
+        temperature: genTemperature,
         max_tokens: maxTokens,
         ...(isJson ? { response_format: { type: 'json_object' } } : {})
       };
@@ -1085,7 +1086,7 @@ async function runAiGeneration({ text, systemInstructionText, isJson = false, ma
             systemInstruction: { parts: [{ text: systemInstructionText }] },
             contents: [{ role: 'user', parts: [{ text }] }],
             generationConfig: {
-              temperature: 0.1,
+              temperature: genTemperature,
               maxOutputTokens: maxTokens,
               candidateCount: 1,
               ...(isJson ? { responseMimeType: 'application/json' } : {})
@@ -1132,10 +1133,21 @@ async function runAiGeneration({ text, systemInstructionText, isJson = false, ma
   }
 }
 
+// State tracking for sequential in-place rewrite cycling
+let lastQuickRewrite = {
+  slotId: null,
+  originalText: '',
+  variants: [],
+  lastVariant: '',
+  timestamp: 0
+};
+let isProcessingSlot = false;
+
 // Quick Action Slot Execution (In-place rewrite & paste back OR open HUD)
 function triggerQuickSlotAction(slotId) {
   const slot = (quickPromptSlots || []).find((s) => s.id === slotId);
   if (!slot) return;
+  if (isProcessingSlot) return; // Prevent concurrent overlapping executions on rapid key spam
 
   if (process.platform === 'win32') {
     const copyExe = path.join(__dirname, 'copy_native.exe');
@@ -1148,17 +1160,35 @@ function triggerQuickSlotAction(slotId) {
     const handleSlotClipboard = () => {
       setTimeout(async () => {
         const selectedText = clipboard.readText();
-        if (!selectedText || !selectedText.trim()) {
-          // No text selected: restore user's previous clipboard and exit silently
+        const trimmed = selectedText ? selectedText.trim() : '';
+
+        const now = Date.now();
+        const isRecent = (now - lastQuickRewrite.timestamp) < 45000;
+        const isSameSlot = lastQuickRewrite.slotId === slotId;
+
+        // Check if user pressed key again on already-rewritten text:
+        // 1. Text is selected and matches the last variant or any previous variant or original text
+        const matchesLastVariant = Boolean(lastQuickRewrite.lastVariant && trimmed === lastQuickRewrite.lastVariant.trim());
+        const matchesAnyVariant = Boolean(trimmed && lastQuickRewrite.variants.some(v => v.trim() === trimmed));
+        const matchesOriginal = Boolean(lastQuickRewrite.originalText && trimmed === lastQuickRewrite.originalText.trim());
+
+        const isExplicitNextVariant = isRecent && isSameSlot && (matchesLastVariant || matchesAnyVariant || matchesOriginal);
+        // 2. Alternatively: nothing was selected, but user pressed the same hotkey right after a recent in-place rewrite (within 15s)
+        const isConsecutiveUndoVariant = !trimmed && isRecent && isSameSlot && Boolean(lastQuickRewrite.lastVariant) && (now - lastQuickRewrite.timestamp < 15000);
+
+        if (!trimmed && !isConsecutiveUndoVariant) {
+          // Truly no text selected: restore user's previous clipboard and exit silently
           if (previousClipboard) {
             clipboard.writeText(previousClipboard);
           }
           return;
         }
 
-        const trimmed = selectedText.trim();
+        const isAlternativeCycle = isExplicitNextVariant || isConsecutiveUndoVariant;
+        const textToTransform = isAlternativeCycle ? lastQuickRewrite.originalText : trimmed;
 
         if (slot.pasteBack) {
+          isProcessingSlot = true;
           // Direct In-Place Text Processing & Replacement
           let cfg = resolveActiveProviderConfig();
           if (cfg.provider !== 'openai_compatible' && !cfg.apiKey) {
@@ -1167,6 +1197,7 @@ function triggerQuickSlotAction(slotId) {
           }
 
           if (cfg.provider !== 'openai_compatible' && !cfg.apiKey) {
+            isProcessingSlot = false;
             focusAppWindow(true);
             if (mainWindow) {
               mainWindow.webContents.send('open-settings');
@@ -1175,27 +1206,59 @@ function triggerQuickSlotAction(slotId) {
           }
 
           try {
-            const systemInstructionText = `You are a precision text transformer. Follow this user instruction precisely: "${slot.prompt}". Keep the original language unless the instruction explicitly specifies a different language. Output ONLY the transformed text directly without conversational preamble, introduction, markdown commentary, or quotes.`;
+            if (!isAlternativeCycle) {
+              // Start a fresh rewrite session
+              lastQuickRewrite = {
+                slotId,
+                originalText: trimmed,
+                variants: [],
+                lastVariant: '',
+                timestamp: now
+              };
+            }
+
+            let systemInstructionText = '';
+            if (isAlternativeCycle && lastQuickRewrite.variants.length > 0) {
+              const avoidList = lastQuickRewrite.variants.slice(-4).map(v => `"${v}"`).join(', ');
+              systemInstructionText = `You are a precision text transformer. Follow this user instruction: "${slot.prompt}".
+Keep the original language unless the instruction explicitly specifies a different language.
+CRITICAL REQUIREMENT: Provide a DISTINCT ALTERNATIVE VARIATION with fresh phrasing. You MUST NOT repeat or closely mimic any of these previous variants: ${avoidList}.
+Use natural synonyms, varied sentence structures, and alternative vocabulary while strictly maintaining the original meaning.
+Output ONLY the transformed text directly without conversational preamble, introduction, markdown commentary, or quotes.`;
+            } else {
+              systemInstructionText = `You are a precision text transformer. Follow this user instruction precisely: "${slot.prompt}". Keep the original language unless the instruction explicitly specifies a different language. Output ONLY the transformed text directly without conversational preamble, introduction, markdown commentary, or quotes.`;
+            }
 
             const outputText = await runAiGeneration({
-              text: trimmed,
+              text: textToTransform,
               systemInstructionText,
               isJson: false,
-              maxTokens: Math.max(128, Math.min(2048, trimmed.length * 4))
+              maxTokens: Math.max(128, Math.min(2048, textToTransform.length * 4)),
+              temperature: isAlternativeCycle ? 0.75 : 0.1
             });
 
             if (outputText && outputText.trim()) {
               const cleanOutput = outputText.trim();
+              if (!lastQuickRewrite.variants.includes(cleanOutput)) {
+                lastQuickRewrite.variants.push(cleanOutput);
+              }
+              lastQuickRewrite.lastVariant = cleanOutput;
+              lastQuickRewrite.timestamp = Date.now();
+
               clipboard.writeText(cleanOutput);
 
-              // Synthesize in-place Paste (Ctrl + V) with minimal delay
+              // Synthesize in-place paste:
+              // If consecutive undo variant (nothing was highlighted), send 'undopaste' (Ctrl+Z then Ctrl+V)
+              // Otherwise (text was highlighted), standard 'paste' (Ctrl+V) replaces selection
+              const pasteMode = isConsecutiveUndoVariant ? 'undopaste' : 'paste';
+
               setTimeout(() => {
                 if (fs.existsSync(copyExe)) {
-                  execFile(copyExe, ['paste'], (err) => {
-                    if (err) console.warn('Native paste execution error:', err);
+                  execFile(copyExe, [pasteMode], (err) => {
+                    if (err) console.warn(`Native ${pasteMode} execution error:`, err);
                   });
                 } else if (fs.existsSync(copyVbs)) {
-                  exec(`wscript.exe "${copyVbs}" paste`);
+                  exec(`wscript.exe "${copyVbs}" ${pasteMode}`);
                 }
               }, 10);
             } else {
@@ -1209,12 +1272,14 @@ function triggerQuickSlotAction(slotId) {
             if (previousClipboard) {
               clipboard.writeText(previousClipboard);
             }
+          } finally {
+            isProcessingSlot = false;
           }
         } else {
           // Open Floating HUD with explicit custom prompt
           if (mainWindow) {
             mainWindow.webContents.send('quick-translate', {
-              text: trimmed,
+              text: textToTransform,
               customPrompt: slot.prompt,
               slotName: slot.name
             });

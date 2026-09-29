@@ -112,7 +112,7 @@ export function App() {
     storageService.syncToElectron();
   }, []);
 
-  const executeTranslationWithMode = useCallback(async (textToTranslate, explicitTargetLang, explicitExplainMode, explicitCustomPrompt) => {
+  const executeTranslationWithMode = useCallback(async (textToTranslate, explicitTargetLang, explicitExplainMode, explicitCustomPrompt, options = {}) => {
     const text = textToTranslate !== undefined ? textToTranslate : sourceText;
     if (!text || !text.trim()) return;
 
@@ -155,7 +155,6 @@ export function App() {
         onStreamChunk: (partialText) => {
           if (!mode) {
             setTranslatedText(partialText);
-            setIsLoading(false);
           }
         }
       });

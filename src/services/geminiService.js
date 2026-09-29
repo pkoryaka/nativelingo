@@ -277,7 +277,9 @@ export async function translateText({
   explainJargon = false,
   model = 'gemini-flash-lite-latest',
   temperature = 0.0,
-  onStreamChunk = null
+  onStreamChunk = null,
+  isAlternative = false,
+  previousTranslation = ''
 }) {
   const currentSettings = storageService.getSettings();
   const currentProviderId = currentSettings.aiProvider || 'gemini';
@@ -299,9 +301,9 @@ export async function translateText({
     ? (currentSettings.customGeminiModel || model || currentSettings.model || defaultModel)
     : (currentSettings.customModel || defaultModel);
 
-  // 1. Check Local Memory Cache (Instant 0ms response)
+  // 1. Check Local Memory Cache (Instant 0ms response) - bypassed when requesting alternative phrasing
   const cacheKey = getCacheKey(trimmedText, sourceLang, targetLang, customPrompt, explainJargon, targetModel);
-  if (translationCache.has(cacheKey)) {
+  if (!isAlternative && translationCache.has(cacheKey)) {
     const cachedResult = translationCache.get(cacheKey);
     if (onStreamChunk) {
       onStreamChunk(cachedResult.translation);
@@ -335,17 +337,18 @@ Respond ONLY in JSON format:
   } else if (customPrompt && customPrompt.trim()) {
     // Custom prompt slot / precision instruction mode: strictly follow prompt instruction
     systemInstructionText = `You are a precision text transformer. Follow this user instruction precisely: "${customPrompt.trim()}". Keep the original language unless the instruction explicitly specifies a different language. Output ONLY the transformed text directly without conversational preamble, introduction, markdown commentary, or quotes.`;
+  } else if (isAlternative && previousTranslation) {
+    systemInstructionText = `Provide a distinct alternative, natural variation in phrasing for the translation from ${sourceName} into ${targetName}. It must express the exact same meaning with high accuracy, but use different vocabulary, synonyms, or sentence structure than: "${previousTranslation}". Output direct translation only without quotes, preamble, or commentary.`;
   } else {
     // Pure translation mode: concise prompt for lowest TTFT
     systemInstructionText = `Translate into ${targetName}. Output direct translation only without quotes, preamble, or commentary.`;
   }
 
-  // Generation configuration tuned for lowest latency:
-  // - temperature: 0 (greedy decoding - fastest token generation)
-  // - maxOutputTokens: dynamically sized so KV cache isn't over-allocated
+  // Generation configuration tuned for lowest latency (or creative diversity if alternative)
   const maxTokens = explainJargon ? 2048 : Math.max(128, Math.min(1024, userText.length * 3));
+  const effectiveTemp = isAlternative ? 0.7 : (temperature ?? 0.0);
   const generationConfig = {
-    temperature: 0.0,
+    temperature: effectiveTemp,
     maxOutputTokens: maxTokens,
     candidateCount: 1,
     ...(explainJargon ? { responseMimeType: 'application/json' } : {})
@@ -361,7 +364,9 @@ Respond ONLY in JSON format:
         customPrompt,
         explainJargon,
         model: targetModel,
-        provider: currentProviderId
+        provider: currentProviderId,
+        isAlternative,
+        previousTranslation
       });
 
       if (nativeRes?.rawOutput) {
@@ -429,7 +434,7 @@ Respond ONLY in JSON format:
           model: targetModel,
           system: systemInstructionText,
           messages: [{ role: 'user', content: userText }],
-          temperature: 0.1,
+          temperature: effectiveTemp,
           max_tokens: maxTokens
         })
       });
@@ -510,7 +515,7 @@ Respond ONLY in JSON format:
             { role: 'system', content: systemInstructionText },
             { role: 'user', content: userText }
           ],
-          temperature: 0.1,
+          temperature: effectiveTemp,
           max_tokens: maxTokens,
           ...(explainJargon ? { response_format: { type: 'json_object' } } : {})
         })

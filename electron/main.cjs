@@ -1470,12 +1470,12 @@ ipcMain.handle('window:set-size', (event, { width, height }) => {
 });
 
 // High-speed Native Translation Engine (Gemini Cloud, Anthropic Claude, OpenAI, DeepSeek, Groq, OpenRouter, One API, Local LLM)
-ipcMain.handle('native:translate', async (event, { apiKey, text, targetLang, customPrompt, explainJargon, model, provider }) => {
+ipcMain.handle('native:translate', async (event, { apiKey, text, targetLang, customPrompt, explainJargon, model, provider, isAlternative, previousTranslation }) => {
   const isExplain = Boolean(explainJargon);
   const prompt = (customPrompt && customPrompt.trim()) ? customPrompt.trim() : '';
 
   // 1. If hotkey already initiated a direct Node.js stream concurrently with window paint, reuse it!
-  if (activeDirectStream && activeDirectStream.text === text && !isExplain && !prompt) {
+  if (activeDirectStream && activeDirectStream.text === text && !isExplain && !prompt && !isAlternative) {
     try {
       const rawOutput = await activeDirectStream.promise;
       activeDirectStream = null;
@@ -1492,9 +1492,12 @@ ipcMain.handle('native:translate', async (event, { apiKey, text, targetLang, cus
     ? `Translate into ${targetLang}, clarify meaning, detect tone, and break down slang/idioms. Respond ONLY in JSON format: {"detectedSourceLanguage":"string","translation":"string","plainLanguageMeaning":"string","detectedTone":"string","jargonBreakdown":[{"term":"string","literalMeaning":"string","intendedMeaning":"string","nuance":"string"}],"culturalNotes":"string"}`
     : prompt
     ? `You are a precision text transformer. Follow this user instruction precisely: "${prompt}". Keep the original language unless the instruction explicitly specifies a different language. Output ONLY the transformed text directly without conversational preamble, introduction, markdown commentary, or quotes.`
+    : (isAlternative && previousTranslation)
+    ? `Provide a distinct alternative, natural variation in phrasing for the translation into ${targetLang}. It must express the exact same meaning accurately, but use different vocabulary, synonyms, or sentence structure than: "${previousTranslation}". Output direct translation only without quotes, preamble, or commentary.`
     : `Translate into ${targetLang}. Output direct translation only without quotes, preamble, or commentary.`;
 
   const cfg = resolveActiveProviderConfig({ provider, model, apiKey });
+  const genTemperature = isAlternative ? 0.7 : 0.0;
 
   // Ultra-fast streaming path in Node.js (bypasses Chromium renderer throttling)
   if (!isExplain && (cfg.provider === 'openai_compatible' || cfg.apiKey)) {
@@ -1519,7 +1522,7 @@ ipcMain.handle('native:translate', async (event, { apiKey, text, targetLang, cus
             messages: [{ role: 'user', content: text }],
             stream: true,
             max_tokens: Math.max(128, Math.min(1024, text.length * 3)),
-            temperature: 0.0
+            temperature: genTemperature
           })
         });
         clearTimeout(timeoutId);
@@ -1581,7 +1584,7 @@ ipcMain.handle('native:translate', async (event, { apiKey, text, targetLang, cus
               { role: 'system', content: systemInstructionText },
               { role: 'user', content: text }
             ],
-            temperature: 0.1,
+            temperature: genTemperature,
             stream: true,
             max_tokens: Math.max(128, Math.min(1024, text.length * 3))
           })
@@ -1643,7 +1646,7 @@ ipcMain.handle('native:translate', async (event, { apiKey, text, targetLang, cus
             systemInstruction: { parts: [{ text: systemInstructionText }] },
             contents: [{ role: 'user', parts: [{ text }] }],
             generationConfig: {
-              temperature: 0.0,
+              temperature: genTemperature,
               maxOutputTokens: Math.max(128, Math.min(1024, text.length * 3)),
               candidateCount: 1
             }

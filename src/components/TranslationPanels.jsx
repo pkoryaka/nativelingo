@@ -8,7 +8,8 @@ import {
   Clipboard, 
   ArrowRight, 
   Loader2,
-  CornerDownLeft
+  CornerDownLeft,
+  RefreshCw
 } from 'lucide-react';
 import { ttsService } from '../services/ttsService';
 
@@ -20,7 +21,12 @@ export function TranslationPanels({
   targetLang,
   isLoading,
   onTranslate,
-  errorMessage
+  errorMessage,
+  onGetAlternative,
+  variantsCount = 1,
+  currentVariantIndex = 0,
+  onPrevVariant,
+  onNextVariant
 }) {
   const [copied, setCopied] = useState(false);
   const [isSpeakingSource, setIsSpeakingSource] = useState(false);
@@ -207,19 +213,59 @@ export function TranslationPanels({
 
         <div className="panel-footer">
           <div className="panel-meta">
-            {translatedText ? <span>{translatedText.length} characters</span> : <span>Ready</span>}
+            {translatedText ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>{translatedText.length} characters</span>
+                {variantsCount > 1 && (
+                  <div className="variant-stepper">
+                    <span className="badge-variant">Variant {currentVariantIndex + 1}/{variantsCount}</span>
+                    <button
+                      type="button"
+                      className="btn-stepper"
+                      onClick={onPrevVariant}
+                      disabled={currentVariantIndex <= 0}
+                      title="Previous variant"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-stepper"
+                      onClick={onNextVariant}
+                      disabled={currentVariantIndex >= variantsCount - 1}
+                      title="Next variant"
+                    >
+                      ›
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : <span>Ready</span>}
           </div>
 
           <div className="action-buttons-group">
             {translatedText && (
-              <button
-                type="button"
-                className={`btn-icon ${isSpeakingTarget ? 'active' : ''}`}
-                onClick={() => speakText(translatedText, targetLang, setIsSpeakingTarget)}
-                title="Listen to translation"
-              >
-                {isSpeakingTarget ? <VolumeX size={16} /> : <Volume2 size={16} />}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="btn-alternative"
+                  onClick={onGetAlternative}
+                  disabled={isLoading}
+                  title="Generate alternative translation phrasing variant"
+                >
+                  <RefreshCw size={14} className={isLoading ? 'spinner' : ''} />
+                  <span>Alternative</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`btn-icon ${isSpeakingTarget ? 'active' : ''}`}
+                  onClick={() => speakText(translatedText, targetLang, setIsSpeakingTarget)}
+                  title="Listen to translation"
+                >
+                  {isSpeakingTarget ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                </button>
+              </>
             )}
           </div>
         </div>

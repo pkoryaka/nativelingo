@@ -22,6 +22,10 @@ export function App() {
   const [targetLang, setTargetLang] = useState(settings.primaryTargetLanguage || 'uk');
   const [sourceText, setSourceText] = useState('');
   const [translatedText, setTranslatedText] = useState('');
+  const [lastTranslatedSource, setLastTranslatedSource] = useState('');
+  const [lastTargetLang, setLastTargetLang] = useState('');
+  const [translationVariants, setTranslationVariants] = useState([]);
+  const [currentVariantIndex, setCurrentVariantIndex] = useState(0);
   
   const [customPrompt, setCustomPrompt] = useState('');
   const [activePreset, setActivePreset] = useState(null);
@@ -128,9 +132,13 @@ export function App() {
     // When a custom prompt is active, do NOT force default target language to Ukrainian
     const effectiveTarget = effectivePrompt ? (explicitTargetLang || '') : (explicitTargetLang || targetLang || currentSettings.primaryTargetLanguage || 'uk');
 
+    // Automatic alternative variant detection: if translating the same text again
+    const isSameQuery = text.trim() === lastTranslatedSource.trim() && effectiveTarget === lastTargetLang;
+    const isAlternative = Boolean(options.isAlternative) || (isSameQuery && Boolean(translatedText) && !options.forceFresh);
+
     setIsLoading(true);
     setErrorMessage('');
-    setExplanationData(null);
+    if (!mode) setExplanationData(null);
 
     try {
       const result = await translateText({
@@ -142,6 +150,8 @@ export function App() {
         explainJargon: mode,
         model: currentSettings.model || 'gemini-flash-lite-latest',
         temperature: currentSettings.temperature ?? 0.1,
+        isAlternative,
+        previousTranslation: isAlternative ? (options.previousTranslation || translatedText) : '',
         onStreamChunk: (partialText) => {
           if (!mode) {
             setTranslatedText(partialText);
@@ -151,9 +161,23 @@ export function App() {
       });
 
       if (result) {
-        setTranslatedText(result.translation);
+        const newTranslation = result.translation;
+        setTranslatedText(newTranslation);
         if (result.isExplained) {
           setExplanationData(result);
+        }
+
+        if (isAlternative) {
+          setTranslationVariants((prev) => {
+            const nextList = prev.includes(newTranslation) ? prev : [...prev, newTranslation];
+            setCurrentVariantIndex(nextList.indexOf(newTranslation));
+            return nextList;
+          });
+        } else {
+          setLastTranslatedSource(text.trim());
+          setLastTargetLang(effectiveTarget);
+          setTranslationVariants([newTranslation]);
+          setCurrentVariantIndex(0);
         }
 
         // Save to History
@@ -174,16 +198,42 @@ export function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [sourceText, sourceLang, targetLang, customPrompt, explainJargon]);
+  }, [sourceText, sourceLang, targetLang, customPrompt, explainJargon, lastTranslatedSource, lastTargetLang, translatedText]);
 
   const handleTranslate = useCallback(() => {
     executeTranslationWithMode(sourceText, targetLang, explainJargon);
   }, [executeTranslationWithMode, sourceText, targetLang, explainJargon]);
 
+  // Request alternative phrasing variant
+  const handleGetAlternative = useCallback(() => {
+    if (!sourceText || !sourceText.trim() || !translatedText) return;
+    executeTranslationWithMode(sourceText, targetLang, explainJargon, undefined, {
+      isAlternative: true,
+      previousTranslation: translatedText
+    });
+  }, [executeTranslationWithMode, sourceText, targetLang, explainJargon, translatedText]);
+
+  // Cycle through collected translation variants
+  const handlePrevVariant = useCallback(() => {
+    if (currentVariantIndex > 0) {
+      const prevIdx = currentVariantIndex - 1;
+      setCurrentVariantIndex(prevIdx);
+      setTranslatedText(translationVariants[prevIdx]);
+    }
+  }, [currentVariantIndex, translationVariants]);
+
+  const handleNextVariant = useCallback(() => {
+    if (currentVariantIndex < translationVariants.length - 1) {
+      const nextIdx = currentVariantIndex + 1;
+      setCurrentVariantIndex(nextIdx);
+      setTranslatedText(translationVariants[nextIdx]);
+    }
+  }, [currentVariantIndex, translationVariants]);
+
   const handleMiniTargetLangChange = (newTarget) => {
     setTargetLang(newTarget);
     if (sourceText && sourceText.trim()) {
-      executeTranslationWithMode(sourceText, newTarget, explainJargon);
+      executeTranslationWithMode(sourceText, newTarget, explainJargon, undefined, { forceFresh: true });
     }
   };
 
@@ -400,13 +450,25 @@ export function App() {
       {/* Main Translation Panels */}
       <TranslationPanels
         sourceText={sourceText}
-        setSourceText={setSourceText}
+        setSourceText={(newText) => {
+          setSourceText(newText);
+          if (newText !== sourceText) {
+            setLastTranslatedSource('');
+            setTranslationVariants([]);
+            setCurrentVariantIndex(0);
+          }
+        }}
         translatedText={translatedText}
         sourceLang={sourceLang}
         targetLang={targetLang}
         isLoading={isLoading}
         onTranslate={handleTranslate}
         errorMessage={errorMessage}
+        onGetAlternative={handleGetAlternative}
+        variantsCount={translationVariants.length}
+        currentVariantIndex={currentVariantIndex}
+        onPrevVariant={handlePrevVariant}
+        onNextVariant={handleNextVariant}
       />
 
       {/* Jargon & Plain Language Explanation Card (rendered if available) */}

@@ -22,7 +22,7 @@ If isHidden Then
 End If
 
 If fso.FileExists(electronExe) Then
-  WshShell.Run """" & electronExe & """ """ & strPath & """" & args, windowStyle, False
+  WshShell.Run """" & electronExe & """ ." & args, windowStyle, False
 Else
   WshShell.Run "cmd /c call """ & strPath & "\start.bat""" & args, windowStyle, False
 End If

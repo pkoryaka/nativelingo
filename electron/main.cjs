@@ -8,6 +8,20 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
   process.exit(0);
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.setAlwaysOnTop(true);
+      mainWindow.focus();
+      mainWindow.setAlwaysOnTop(false);
+      mainWindow.webContents.send('show-full-window');
+    } else {
+      createWindow();
+    }
+  });
 }
 
 process.on('uncaughtException', (err) => {
@@ -530,6 +544,15 @@ function createWindow() {
   const distHtml = path.join(__dirname, '../dist/index.html');
   mainWindow.webContents.on('did-fail-load', (e, errorCode, errorDescription) => {
     console.error('mainWindow failed to load:', errorCode, errorDescription);
+  });
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    console.log(`[Renderer] [${level}] ${message} (${sourceId}:${line})`);
+  });
+  mainWindow.webContents.on('did-finish-load', () => {
+    console.log('[Main] Renderer finished loading successfully!');
+  });
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    console.error('[Main] Renderer process gone:', details);
   });
 
   if (fs.existsSync(distHtml) && process.env.VITE_DEV !== 'true') {
@@ -1353,16 +1376,6 @@ function registerGlobalHotkeys(newTranslateKey, newExplainKey, newSlots) {
   updateTrayMenu();
 }
 
-app.on('second-instance', () => {
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.setAlwaysOnTop(true);
-    mainWindow.focus();
-    mainWindow.setAlwaysOnTop(false);
-    mainWindow.webContents.send('show-full-window');
-  }
-});
 
 app.whenReady().then(() => {
   cleanRogueRegistryEntries();

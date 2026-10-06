@@ -28,9 +28,9 @@
 ---
 
 > ### 💡 Our Mission: Helping People Truly Understand Each Other
-> In modern workplaces, people constantly struggle to understand what a specific phrase actually meant — wondering if a comment is passive-aggressive, second-guessing an ambiguous message, or trying to bridge technical dialects between **IT, Marketing, Accounting, and the Lab**.
+> In modern global workplaces, people constantly struggle to understand what a specific phrase actually meant — **whichever language it was**. Whether it's an incoming email in German or Japanese, subtle cross-cultural sarcasm, or confusing departmental jargon between **IT, Marketing, Accounting, and the Lab**.
 >
-> **NativeLingo exists to eliminate that anxiety.** We help people decode what was really meant and reply with clarity, empathy, and native confidence — across 53+ languages and every department.
+> **NativeLingo exists to eliminate that anxiety.** We go beyond literal translation to decode what was really meant, sense the emotional tone, and help you reply with clarity, empathy, and native confidence — across 53+ languages and every department.
 
 ---
 

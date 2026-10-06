@@ -28,3 +28,11 @@
 - **Light Theme Implementation**: Completely redesigned `website/style.css` using modern porcelain background (`#f8fafc`), clean elevated cards (`#ffffff`), slate text (`#0f172a`), indigo primary (`#4f46e5`), and emerald accents (`#059669`).
 - **Workflow Diagram Removal**: Removed complex engineering BPMN diagram from the public landing page and replaced it with a clean executive comparison matrix comparing direct workstation connections against traditional web translators.
 - **Interactive Simulator**: Added the Slack thread reply scenario as the default active playground preset.
+
+## 4. Cross-Department Rosetta Stone & Tone Transmission Strategy
+- **Core Insight**: Real-world workplace communication friction stems from domain jargon barriers (IT vs Marketing/BizDev, Chemical Labs/QA vs Sales/Commercial, Accounting/Finance vs Project Teams) and emotional tone misinterpretations.
+- **Tone Radar / Emotional Subtext Decoder**: Detects emotional temperature (e.g., passive-aggressive pushback, escalation anxiety, bureaucratic ultimatum, technical blocker).
+- **Tone Transmission Filter**: Re-transmits the outgoing message in the exact register required by the recipient (diplomatic reassurance, crisp executive summary, actionable collaboration).
+- **Public Website & Playground Integration**:
+  - Added dedicated `#crossdept` section on the landing page with interactive domain comparisons.
+  - Added dynamic Tone Radar pill (`sim-tone-bar`) to the live playground with real-time updates for each scenario.

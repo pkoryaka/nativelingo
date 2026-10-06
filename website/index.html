@@ -42,6 +42,7 @@
 
       <nav class="nav-links">
         <a href="#solutions" class="nav-item">Solutions</a>
+        <a href="#crossdept" class="nav-item">Cross-Team</a>
         <a href="#simulator" class="nav-item">Live Demo</a>
         <a href="#features" class="nav-item">Features</a>
         <a href="#byom" class="nav-item">BYOM & Privacy</a>
@@ -229,24 +230,24 @@
           <span class="tab-title">Slack Thread Reply</span>
           <span class="tab-hotkey">Ctrl + Alt + R</span>
         </button>
-        <button class="sim-tab" data-scenario="support" id="tab-support">
-          <span class="tab-emoji">🎧</span>
-          <span class="tab-title">Angry Customer Reply</span>
+        <button class="sim-tab" data-scenario="crossdept" id="tab-crossdept">
+          <span class="tab-emoji">🔬</span>
+          <span class="tab-title">Lab & IT ➔ Business</span>
           <span class="tab-hotkey">Ctrl + Alt + 1</span>
         </button>
         <button class="sim-tab" data-scenario="jargon" id="tab-jargon">
           <span class="tab-emoji">🕵️‍♂️</span>
-          <span class="tab-title">Demystify Corporate Slang</span>
+          <span class="tab-title">Tone & Jargon Radar</span>
           <span class="tab-hotkey">Ctrl + Alt + J</span>
         </button>
-        <button class="sim-tab" data-scenario="code" id="tab-code">
-          <span class="tab-emoji">💻</span>
-          <span class="tab-title">Polish PR Review</span>
+        <button class="sim-tab" data-scenario="finance" id="tab-finance">
+          <span class="tab-emoji">📊</span>
+          <span class="tab-title">Finance ➔ Project Team</span>
           <span class="tab-hotkey">Ctrl + Alt + 2</span>
         </button>
         <button class="sim-tab" data-scenario="translate" id="tab-translate">
           <span class="tab-emoji">🌍</span>
-          <span class="tab-title">Instant German Translation</span>
+          <span class="tab-title">Technical Translation</span>
           <span class="tab-hotkey">Ctrl + Alt + T</span>
         </button>
       </div>
@@ -275,6 +276,19 @@ Elena: Client wants an update in 30 mins, who is telling them?"
             </div>
           </div>
 
+          <!-- Dynamic Tone Radar & Transmission Bar -->
+          <div class="sim-tone-bar">
+            <div class="tone-pill detected">
+              <span class="tone-label">DECODED TONE:</span>
+              <span class="tone-val" id="sim-tone-detected">⚠️ Blocker Panic & High Pressure</span>
+            </div>
+            <div class="tone-arrow-icon">➔</div>
+            <div class="tone-pill target">
+              <span class="tone-label">TRANSMITTED TONE:</span>
+              <span class="tone-val" id="sim-tone-target">🎯 Diplomatic Ownership & Clear Client Reassurance</span>
+            </div>
+          </div>
+
           <div class="sim-hud-arrow">
             <span class="arrow-badge" id="sim-action-badge">Pressing Ctrl + Alt + R (Context-Aware Thread Reply)</span>
           </div>
@@ -287,6 +301,119 @@ Elena: Client wants an update in 30 mins, who is telling them?"
             <div class="sim-text-content output" id="sim-output-text">
               "I will update the client right now. I will explain that our staging quality checks caught an edge case in payment webhook validation, and we are proactively rescheduling deployment by 48 hours to ensure zero transaction failures in production."
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cross-Department Translation & Tone Mediation Section -->
+  <section class="crossdept-section" id="crossdept">
+    <div class="section-container">
+      <div class="section-header">
+        <div class="section-tag">CROSS-FUNCTIONAL INTELLIGENCE</div>
+        <h2>The Cross-Department Rosetta Stone</h2>
+        <p>In global companies, the deepest language barrier isn't between countries — it's between departments. NativeLingo bridges specialized vocabularies and transmits the exact tone each stakeholder needs to hear.</p>
+      </div>
+
+      <div class="crossdept-grid">
+        <!-- Card 1: IT & Engineering -> BizDev & Exec -->
+        <div class="crossdept-card">
+          <div class="crossdept-header">
+            <div class="crossdept-badge-icon">💻</div>
+            <div>
+              <h3>IT & Engineering ➔ Marketing & BizDev</h3>
+              <div class="crossdept-sub">Bridging raw technical blockers with commercial timelines</div>
+            </div>
+          </div>
+          <div class="crossdept-dialogue">
+            <div class="dialogue-row">
+              <span class="dialogue-tag raw">Raw Engineer:</span>
+              <div class="dialogue-text">"Can't ship: upstream webhook payload schema mismatch, DB connection pool exhausted under 800rps."</div>
+            </div>
+            <div class="dialogue-row">
+              <span class="dialogue-tag solved">NativeLingo:</span>
+              <div class="dialogue-text"><strong>"We identified an edge-case in data validation and are optimizing throughput. Core user flows are stable; client update ETA is 4pm today."</strong></div>
+            </div>
+          </div>
+          <div class="crossdept-tone-meter">
+            <span>Tone Shift:</span>
+            <strong>Defensive Technical Friction ➔ Clear Commercial Reassurance</strong>
+          </div>
+        </div>
+
+        <!-- Card 2: Chemical Labs & QA -> Commercial & Ops -->
+        <div class="crossdept-card">
+          <div class="crossdept-header">
+            <div class="crossdept-badge-icon">🔬</div>
+            <div>
+              <h3>Chemical Labs & QA ➔ Commercial & Ops</h3>
+              <div class="crossdept-sub">Translating strict lab tolerances into clear go/no-go decisions</div>
+            </div>
+          </div>
+          <div class="crossdept-dialogue">
+            <div class="dialogue-row">
+              <span class="dialogue-tag raw">Raw Lab Report:</span>
+              <div class="dialogue-text">"Batch #309 assay titration failed at 91.4% purity threshold due to thermal excursion. CoA withheld pending 72h re-crystallisation."</div>
+            </div>
+            <div class="dialogue-row">
+              <span class="dialogue-tag solved">NativeLingo:</span>
+              <div class="dialogue-text"><strong>"Dispatch for Batch #309 is rescheduled by 72 hours for an additional purity run to ensure full regulatory release. Final delivery ETA is Thursday morning."</strong></div>
+            </div>
+          </div>
+          <div class="crossdept-tone-meter">
+            <span>Tone Shift:</span>
+            <strong>Dense Lab Specifications ➔ Decisive Executive Go/No-Go</strong>
+          </div>
+        </div>
+
+        <!-- Card 3: Finance & Accounting -> Operations & R&D -->
+        <div class="crossdept-card">
+          <div class="crossdept-header">
+            <div class="crossdept-badge-icon">📊</div>
+            <div>
+              <h3>Accounting & Finance ➔ Operations & R&D</h3>
+              <div class="crossdept-sub">De-escalating audit requests and budget variance friction</div>
+            </div>
+          </div>
+          <div class="crossdept-dialogue">
+            <div class="dialogue-row">
+              <span class="dialogue-tag raw">Raw Audit Note:</span>
+              <div class="dialogue-text">"Please provide itemized OPEX allocation variances and CAPEX depreciation schedules before EoD or project approvals freeze."</div>
+            </div>
+            <div class="dialogue-row">
+              <span class="dialogue-tag solved">NativeLingo:</span>
+              <div class="dialogue-text"><strong>"To keep your project approvals on schedule today, we need quick line-item confirmation on two OPEX categories. Here is the pre-filled template to make this take under 5 minutes."</strong></div>
+            </div>
+          </div>
+          <div class="crossdept-tone-meter">
+            <span>Tone Shift:</span>
+            <strong>Bureaucratic Ultimatum ➔ Collaborative Partnership</strong>
+          </div>
+        </div>
+
+        <!-- Card 4: Tone Radar & Transmission -->
+        <div class="crossdept-card">
+          <div class="crossdept-header">
+            <div class="crossdept-badge-icon">🎭</div>
+            <div>
+              <h3>Tone Radar & Emotional Subtext Decoder</h3>
+              <div class="crossdept-sub">Understand the real feelings behind every workplace message</div>
+            </div>
+          </div>
+          <div class="crossdept-dialogue">
+            <div class="dialogue-row">
+              <span class="dialogue-tag raw">Subtext Read:</span>
+              <div class="dialogue-text">"Per my previous email, let's table this for Q3 so we don't boil the ocean." ➔ <em>Decodes: Frustration marker (info already sent) + polite soft rejection.</em></div>
+            </div>
+            <div class="dialogue-row">
+              <span class="dialogue-tag solved">Outgoing Tone:</span>
+              <div class="dialogue-text"><strong>Select your transmitted tone: Diplomatic Consensus, Concise Executive Summary, or Reassuring Action Plan with 1 hotkey.</strong></div>
+            </div>
+          </div>
+          <div class="crossdept-tone-meter">
+            <span>Capabilities:</span>
+            <strong>4-Stage Emotional Radar • In-Place Tone Modulation</strong>
           </div>
         </div>
       </div>

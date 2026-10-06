@@ -82,6 +82,22 @@ NativeLingo keeps you completely in flow across all Windows apps:
 
 ---
 
+## 🔬 The Cross-Department Rosetta Stone
+
+In global companies, the deepest language barrier is rarely national languages — it is **cross-departmental jargon and emotional tone friction**. NativeLingo acts as a real-time organizational bridge:
+
+| Department Pair | The Daily Friction Point | NativeLingo Mediation |
+| :--- | :--- | :--- |
+| **💻 IT $\leftrightarrow$ 📈 Marketing & BizDev** | Engineers write: *"Cannot ship: DB connection pool exhausted under 800rps."* BizDev hears: *"Engineers are refusing to help our client."* | **Translates to:** *"Identified an edge case in data validation and optimizing throughput; release rescheduled to 4pm with all core flows protected."* |
+| **🔬 Chemical Labs & QA $\leftrightarrow$ 💼 Commercial & Ops** | Lab writes: *"Batch #309 assay titration failed at 91.4% purity threshold due to thermal excursion."* Sales needs a clear shipping answer. | **Translates to:** *"Dispatch rescheduled by 72 hours for an additional purity run to ensure full regulatory release; final ETA is Thursday 09:00."* |
+| **📊 Accounting $\leftrightarrow$ 🚀 Project Leads & R&D** | Finance writes: *"Provide itemized OPEX allocation variances before EoD or project approvals freeze."* Creative teams feel attacked. | **Translates to:** *"To keep project approvals on schedule today, here is a pre-filled template with two OPEX line-items needing quick 5-min sign-off."* |
+
+### 🎭 Tone Radar & Emotional Transmission
+* **Incoming Subtext Radar (`Ctrl + Alt + J`):** Automatically decodes hidden emotional temperature — such as passive-aggressive pushback (*"Per my previous email"*), escalation anxiety (*"Need this yesterday"*), or diplomatic deflection (*"Let's table this for Q3"*).
+* **Outgoing Tone Transmission (`Ctrl + Alt + 1/2/3` or `Alt + T`):** Cycle through target output tones on the fly (*Diplomatic De-escalation*, *Concise Technical PR*, *Executive Action Summary*) without leaving your active chat window.
+
+---
+
 ## 📦 1-Click Role Preset Packs
 
 NativeLingo includes 1-click curated prompt packs configured for common professional workflows:

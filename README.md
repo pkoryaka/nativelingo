@@ -3,23 +3,23 @@
 <img src="./public/app-icon.png" width="128" height="128" alt="NativeLingo Logo" style="border-radius: 28px;" />
 
 # ⚡ NativeLingo
-### *Understand messages and write clearer replies without leaving your Windows app.*
-#### *Zero-Tab-Switching AI Copilot • 53+ Languages • Jargon Demystifier • Cloud & 100% Offline Local LLMs*
+### *AI Translator & Multilingual Communication Assistant for Windows*
+#### *Zero Tab Switching • Slack Thread Replies • In-Place Tone Cycling • 53+ Languages • 100% Air-Gapped Privacy*
 
-**Highlight text anywhere in Windows, press a shortcut, and translate, demystify corporate jargon, or polish your draft in-place — powered by Google Gemini or 100% air-gapped local Ollama models.**
+**Highlight text anywhere in Windows, press a shortcut, and draft context-aware thread replies, cycle tone variants in-place, demystify corporate jargon, or translate across 53+ languages — powered by Google Gemini, Claude, Groq, or 100% offline local Ollama models.**
 
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-blue?style=for-the-badge&logo=windows)](https://github.com/pkoryaka/nativelingo)
-[![AI Engine](https://img.shields.io/badge/AI%20Engine-Gemini%20%7C%20Ollama%20%7C%20LM%20Studio-8A2BE2?style=for-the-badge&logo=google)](https://aistudio.google.com/)
+[![AI Engine](https://img.shields.io/badge/AI%20Engine-Gemini%20%7C%20Claude%20%7C%20Groq%20%7C%20Ollama-8A2BE2?style=for-the-badge&logo=google)](https://aistudio.google.com/)
 [![BYOM](https://img.shields.io/badge/BYOM-Local%20%26%20OpenAI--Compatible-success?style=for-the-badge)](https://ollama.com/)
-[![Latency](https://img.shields.io/badge/Latency-%3C700ms%20TTFT-brightgreen?style=for-the-badge)](https://github.com/pkoryaka/nativelingo)
-[![Privacy](https://img.shields.io/badge/Privacy-100%25%20Air--Gapped%20Option-orange?style=for-the-badge)](https://github.com/pkoryaka/nativelingo)
+[![Latency](https://img.shields.io/badge/Latency-%3C250ms%20TTFT-brightgreen?style=for-the-badge)](https://github.com/pkoryaka/nativelingo)
+[![Privacy](https://img.shields.io/badge/Privacy-100%25%20Air--Gapped%20Local-orange?style=for-the-badge)](https://github.com/pkoryaka/nativelingo)
 
 <p align="center">
-  <a href="#-the-three-jobs-nativelingo-solves">🎯 The 3 Jobs</a> •
-  <a href="#-role-preset-packs">📦 Role Preset Packs</a> •
-  <a href="#-why-byom-bring-your-own-model">🧠 BYOM Engine</a> •
+  <a href="#-two-audiences-one-privacy-first-engine">👥 Solutions</a> •
+  <a href="#-core-workplace-superpowers">⚡ Superpowers</a> •
+  <a href="#-why-byom-bring-your-own-model">🧠 BYOM Architecture</a> •
   <a href="#-application-compatibility">🖥️ Compatibility</a> •
-  <a href="#-pricing--licensing">💳 Pricing & Licenses</a> •
+  <a href="#-licensing--commercial-tiers">💳 Pricing</a> •
   <a href="#-quick-start">🚀 Quick Start</a>
 </p>
 
@@ -27,17 +27,58 @@
 
 ---
 
-## 🎯 The Three Jobs NativeLingo Solves
+## 👥 Two Audiences. One Privacy-First Engine.
+
+NativeLingo is built to solve everyday communication friction for individual knowledge workers, while providing strict data governance for enterprise security teams:
+
+```
+┌────────────────────────────────────────────────────────┐
+│                      NATIVELINGO                       │
+│     AI Translator & Multilingual Communication         │
+└───────────────────────┬────────────────────────────────┘
+                        │
+       ┌────────────────┴────────────────┐
+       ▼                                 ▼
+┌──────────────────────────────┐  ┌──────────────────────────────┐
+│  🚀 FOR INDIVIDUALS          │  │  🛡️ FOR CORPORATE CLIENTS    │
+│  (Viral Spreader Engine)     │  │  (Security & Governance)     │
+├──────────────────────────────┤  ├──────────────────────────────┤
+│ • 100% Free Forever          │  │ • 100% Air-Gapped Local Mode │
+│ • Slack & Teams Thread Reply │  │ • Zero Intermediary Servers  │
+│ • In-Place Tone Cycling      │  │ • Turnkey GPO / policy.json  │
+│ • Jargon & Slang Demystifier │  │ • $0 Markup + Offline Keys   │
+│ • BYOM with Free API Tiers   │  │ • HIPAA / GDPR / SOC 2 Ready │
+└──────────────────────────────┘  └──────────────────────────────┘
+```
+
+### 🚀 1. For Individuals & Knowledge Workers (The Viral Spreader Engine)
+* **Zero Tab Switching:** Never break focus by copy-pasting into browser tabs. NativeLingo operates directly at your Windows cursor.
+* **Instant Slack & Teams Thread Replies (`Ctrl + Alt + R`):** Highlight incoming messages in a thread, tap your hotkey, and watch NativeLingo synthesize the conversation and place a context-aware, culturally fluent reply right into your reply box.
+* **In-Place Tone Cycling (`Alt + T` / `Ctrl + Shift + T`):** Type messy bullet points anywhere; hitting the hotkey rewrites into polished prose. Hit it again to cycle through 3 distinct tone variants (diplomatic, concise, executive).
+* **Jargon & Nuance Demystifier (`Ctrl + Alt + J`):** Decode passive-aggressive phrasing, foreign idioms, and corporate double-speak before sending your response.
+* **100% Free Personal Productivity:** Free forever with BYOM (Google Gemini, Groq, or local Ollama). No subscription lock-in.
+
+### 🛡️ 2. For Corporate Clients & Enterprise IT (Security & Governance Engine)
+* **Stop Shadow-AI Data Leaks:** Employees routinely paste confidential client communications, PII, and proprietary code into public web translators. NativeLingo ends this exfiltration risk.
+* **100% Air-Gapped Offline Mode:** Point to local Ollama, LM Studio, or private on-premise vLLM endpoints. Zero data leaves employee workstations.
+* **Zero Intermediary Servers:** Direct workstation-to-endpoint TLS. NativeLingo operates zero proxy servers and collects zero telemetry.
+* **Centralized Policy Enforcement (`policy.json`):** IT administrators deploy a single JSON configuration via Group Policy (GPO) or Microsoft Intune to lock allowed endpoints, disable cloud egress, and mask keys.
+* **$0 Token Markup & Cryptographic Offline Licensing:** Pay wholesale API rates ($0 markup) instead of $25/user/month SaaS markups. Licenses use Ed25519 offline signatures (`NL1-...`) requiring zero internet call-home.
+
+---
+
+## ⚡ Core Workplace Superpowers
 
 Most translation tools were built for the browser era: *copy text $\rightarrow$ switch tabs $\rightarrow$ paste into ChatGPT/DeepL $\rightarrow$ copy response $\rightarrow$ switch back $\rightarrow$ paste*.
 
-NativeLingo keeps you completely in flow:
+NativeLingo keeps you completely in flow across all Windows apps:
 
-| Job | The Daily Situation | The NativeLingo Solution |
+| Superpower | The Daily Situation | The NativeLingo Solution |
 | :--- | :--- | :--- |
-| **1. Understand** | *"This customer or colleague message contains confusing slang, idioms, or subtle corporate pushback."* | **Press `Ctrl + Alt + J`**: Instant floating breakdown explaining literal meaning vs intended nuance, tone, and slang. |
-| **2. Respond** | *"I know what I want to say, but drafting it professionally in English takes too much time."* | **Press `Ctrl + Alt + 1` or `2`**: Replaces your rough bullet points with a clear, polite, empathetic reply directly in the text field. |
-| **3. Adapt** | *"I need this passage translated or reformatted without losing my place."* | **Press `Ctrl + Alt + T`**: Sub-700ms streaming translation in a floating cursor HUD across 53+ languages. |
+| **1. Thread Reply** | *"A messy thread in Slack or Teams needs a fast, context-aware reply in fluent English or German."* | **Press `Ctrl + Alt + R`**: Highlight conversation messages, hit shortcut, and NativeLingo drafts the reply directly into your input box. |
+| **2. Tone Cycling** | *"I have rough bullet points or thoughts, but need to polish them for clients or executives."* | **Press `Ctrl + Alt + 1/2/3`**: Rewrites in-place. Tap hotkey again to cycle between tone variants. |
+| **3. Understand** | *"This message contains confusing slang, idioms, or subtle corporate pushback."* | **Press `Ctrl + Alt + J`**: Floating breakdown explaining literal meaning vs intended corporate nuance. |
+| **4. Streaming Translation** | *"I need incoming foreign messages or documentation translated without losing my place."* | **Press `Ctrl + Alt + T`**: Sub-250ms streaming translation in a floating HUD across 53+ languages. |
 
 ---
 
@@ -64,11 +105,15 @@ NativeLingo includes 1-click curated prompt packs configured for common professi
 
 ## 🧠 Why BYOM (Bring Your Own Model)?
 
-Workplaces, enterprise policies, and privacy-conscious users cannot always upload sensitive customer tickets or proprietary source code to third-party cloud APIs.
+Workplaces, enterprise policies, and privacy-conscious users cannot upload sensitive customer tickets or proprietary source code to third-party cloud APIs.
 
-<div align="center">
-  <img src="public/bpmn-architecture-light.svg" alt="NativeLingo BPMN 2.0 Architecture" width="100%" style="border-radius: 12px; border: 1px solid #cbd5e1; box-shadow: 0 4px 20px rgba(0,0,0,0.06);" />
-</div>
+| Feature | NativeLingo Direct Connection | Public Web Translators |
+| :--- | :---: | :---: |
+| **Data Path** | **Direct Workstation ➔ Your LLM** | Transmitted through 3rd-Party Cloud |
+| **Telemetry & Cloud Relays** | **Zero (No NativeLingo servers)** | Logged on Vendor Servers |
+| **100% Air-Gapped Offline** | **Supported (Ollama / Local LLM)** | ❌ Not Available |
+| **Token Markup** | **$0.00 (True Wholesale BYOM)** | ❌ Hefty Recurring Markups ($20+/mo) |
+| **Enterprise Governance** | **Turnkey `policy.json` / GPO** | ❌ Shadow IT Copy-Pasting |
 
 ### 1. 🦙 100% Offline Local LLMs (Ollama & LM Studio)
 * **Zero Cloud Data Transmission**: Run locally via `localhost:11434` (Ollama) or `localhost:1234` (LM Studio).
@@ -76,11 +121,11 @@ Workplaces, enterprise policies, and privacy-conscious users cannot always uploa
 * Compatible with any model: `llama3.2`, `mistral`, `deepseek-r1`, `qwen2.5`, `phi-4`, etc.
 
 ### 2. ⚡ Google Gemini Cloud Powerhouse
-* **Sub-700ms Streaming Latency**: Native Node.js Server-Sent Events (SSE) direct pipeline bypasses Chromium background throttling for instant token generation.
+* **Sub-250ms Streaming Latency**: Native Node.js Server-Sent Events (SSE) direct pipeline bypasses Chromium background throttling for instant token generation.
 * Free tier available with generous rate limits directly from Google AI Studio.
 
 ### 3. 🌐 Custom OpenAI-Compatible Endpoints
-* Easily connect to **Groq**, **OpenRouter**, **DeepSeek**, **Together AI**, or internal company LLM gateways.
+* Easily connect to **Groq**, **Claude**, **OpenRouter**, **DeepSeek**, **Together AI**, or internal company LLM gateways.
 
 ---
 
@@ -88,14 +133,14 @@ Workplaces, enterprise policies, and privacy-conscious users cannot always uploa
 
 NativeLingo works natively across standard Windows applications via custom Win32 low-level hooks:
 
-| Application | Highlight & Translate (`Ctrl+Alt+T`) | Jargon Explainer (`Ctrl+Alt+J`) | In-Place Rewrite (`Ctrl+Alt+1/2/3`) |
-| :--- | :---: | :---: | :---: |
-| **Zendesk / Intercom / Freshdesk** | ✅ Supported | ✅ Supported | ✅ Direct In-Place Replace |
-| **Slack / Microsoft Teams / Discord** | ✅ Supported | ✅ Supported | ✅ Direct In-Place Replace |
-| **VS Code / Cursor / Visual Studio** | ✅ Supported | ✅ Supported | ✅ Direct In-Place Replace |
-| **Google Chrome / Microsoft Edge** | ✅ Supported | ✅ Supported | ✅ Direct In-Place Replace |
-| **Microsoft Word / Outlook / Excel** | ✅ Supported | ✅ Supported | ✅ Direct In-Place Replace |
-| **Notion / Obsidian / OneNote** | ✅ Supported | ✅ Supported | ✅ Direct In-Place Replace |
+| Application | Thread Reply (`Ctrl+Alt+R`) | Jargon Explainer (`Ctrl+Alt+J`) | In-Place Rewrite (`Ctrl+Alt+1/2/3`) | Translation (`Ctrl+Alt+T`) |
+| :--- | :---: | :---: | :---: | :---: |
+| **Slack / Teams / Discord** | ✅ Direct Auto-Draft | ✅ Supported | ✅ Direct In-Place Replace | ✅ Streaming HUD |
+| **Zendesk / Intercom / Freshdesk** | ✅ Direct Auto-Draft | ✅ Supported | ✅ Direct In-Place Replace | ✅ Streaming HUD |
+| **VS Code / Cursor / Visual Studio** | ✅ Supported | ✅ Supported | ✅ Direct In-Place Replace | ✅ Streaming HUD |
+| **Google Chrome / Microsoft Edge** | ✅ Supported | ✅ Supported | ✅ Direct In-Place Replace | ✅ Streaming HUD |
+| **Microsoft Word / Outlook / Excel** | ✅ Supported | ✅ Supported | ✅ Direct In-Place Replace | ✅ Streaming HUD |
+| **Notion / Obsidian / OneNote** | ✅ Supported | ✅ Supported | ✅ Direct In-Place Replace | ✅ Streaming HUD |
 
 *(Note: In read-only PDF viewers or elevated admin applications, NativeLingo copies the result to your clipboard with an on-screen confirmation instead of overwriting text).*
 
@@ -107,11 +152,11 @@ NativeLingo follows a **Dual-Use / Fair-Code License** under the [NativeLingo EU
 
 | Tier | Price | Scope & What's Included |
 | :--- | :---: | :--- |
-| **Personal & Educational** | **$0** (Forever) | Full capabilities (auto-paste, 3 hotkey slots, jargon explainer) for individuals, study, and research on unlimited devices. |
+| **Personal & Educational** | **$0** (Forever) | Full capabilities (auto-paste, thread replies, tone cycling, jargon explainer) for individuals on unlimited devices. |
 | **Commercial Evaluation** | **$0** (40 Days) | 40-day fully functional evaluation for companies and workplace teams to assess internal fit. |
-| **Commercial Pro Annual** | **$34 / year** | 1 named commercial user across 2 workstations, all updates, priority corporate support ($2.85/mo). |
-| **Commercial Perpetual** | **$74 one-time** | **$59 Launch Deal** (first 200 copies). Own your version forever for business use + 12 months updates ($24/yr renewal). |
-| **Multi-User Team** | **$49 / seat / yr** | Minimum 3 seats. Centralized license dashboard, reassignable seats, standard business invoicing, priority SLA. |
+| **Commercial Pro Annual** | **$17 / year** | 1 named commercial user across 2 workstations, all updates, priority corporate support ($1.42/mo). |
+| **Commercial Perpetual** | **$29 one-time** | **$29 Launch Deal** (normally $37). Own your version forever for business use + 12 months updates ($12/yr renewal). |
+| **Multi-User Team** | **$24 / seat / yr** | Minimum 3 seats ($72/yr total). Centralized `policy.json`, reassignable seats, standard business invoicing, priority SLA. |
 
 ---
 

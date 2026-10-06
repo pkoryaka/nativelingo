@@ -1,7 +1,7 @@
 {
   "name": "nativelingo",
   "version": "1.0.0",
-  "description": "NativeLingo — Desktop in-place AI clipboard assistant, translator & jargon demystifier with Gemini & BYOM local LLMs.",
+  "description": "NativeLingo — AI Translator & Multilingual Communication Assistant for Windows with Gemini, Claude, Groq & 100% offline local LLMs.",
   "main": "electron/main.cjs",
   "type": "module",
   "scripts": {

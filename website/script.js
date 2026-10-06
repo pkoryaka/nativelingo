@@ -4,6 +4,14 @@
  */
 
 const SCENARIOS = {
+  reply: {
+    app: 'Slack — #team-project-launch',
+    model: 'Gemini 2.5 Flash',
+    latency: '260ms',
+    hotkeyText: 'Pressing Ctrl + Alt + R (Context-Aware Thread Reply)',
+    input: '"Alex: We need to push the deployment back by 2 days because the staging tests failed on payment webhooks.\nElena: Client wants an update in 30 mins, who is telling them?"',
+    output: '"I will update the client right now. I will explain that our staging quality checks caught an edge case in payment webhook validation, and we are proactively rescheduling deployment by 48 hours to ensure zero transaction failures in production."'
+  },
   support: {
     app: 'Slack — #customer-support-urgent',
     model: 'Llama-3.3-70B (Groq)',
@@ -38,9 +46,10 @@ const SCENARIOS = {
   }
 };
 
-let activeScenario = 'support';
+let activeScenario = 'reply';
 
 // DOM Elements
+const tabReply = document.getElementById('tab-reply');
 const tabSupport = document.getElementById('tab-support');
 const tabJargon = document.getElementById('tab-jargon');
 const tabCode = document.getElementById('tab-code');
@@ -57,6 +66,7 @@ const btnSimCopy = document.getElementById('btn-sim-copy');
 // Preset Tab Handlers
 function setupSimulator() {
   const tabs = [
+    { el: tabReply, key: 'reply' },
     { el: tabSupport, key: 'support' },
     { el: tabJargon, key: 'jargon' },
     { el: tabCode, key: 'code' },

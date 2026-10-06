@@ -33,6 +33,8 @@
 - **Core Insight**: Real-world workplace communication friction stems from domain jargon barriers (IT vs Marketing/BizDev, Chemical Labs/QA vs Sales/Commercial, Accounting/Finance vs Project Teams) and emotional tone misinterpretations.
 - **Tone Radar / Emotional Subtext Decoder**: Detects emotional temperature (e.g., passive-aggressive pushback, escalation anxiety, bureaucratic ultimatum, technical blocker).
 - **Tone Transmission Filter**: Re-transmits the outgoing message in the exact register required by the recipient (diplomatic reassurance, crisp executive summary, actionable collaboration).
+- **Core Mission Manifesto**: "Our mission is to help people truly understand each other." Centered around the universal daily workplace struggle of staring at messages wondering "what did that specific phrase actually mean?", ending the anxiety of misinterpretation across departments and languages.
 - **Public Website & Playground Integration**:
+  - Added dedicated Mission Manifesto Card (`.mission-card`) under the Hero.
   - Added dedicated `#crossdept` section on the landing page with interactive domain comparisons.
   - Added dynamic Tone Radar pill (`sim-tone-bar`) to the live playground with real-time updates for each scenario.

@@ -409,6 +409,82 @@ a {
 }
 
 /* ==========================================================================
+   Mission & Empathy Section (Why We Built NativeLingo)
+   ========================================================================== */
+.mission-section {
+  padding: 10px 0 50px;
+}
+
+.mission-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  padding: 36px 40px;
+  box-shadow: 0 10px 30px -5px rgba(79, 70, 229, 0.07), var(--shadow-sm);
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+  position: relative;
+  overflow: hidden;
+}
+
+.mission-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 6px;
+  background: linear-gradient(180deg, var(--primary) 0%, var(--accent-emerald) 100%);
+}
+
+.mission-quote-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: var(--primary-light);
+  border: 1px solid var(--primary-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  flex-shrink: 0;
+}
+
+.mission-body {
+  flex-grow: 1;
+}
+
+.mission-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 8px;
+}
+
+.mission-body h3 {
+  font-size: 1.55rem;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.mission-body p {
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  line-height: 1.68;
+  margin: 0;
+}
+
+.mission-body p strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ==========================================================================
    Audience Segmentation Section (Individuals vs Corporate)
    ========================================================================== */
 .segment-section {
@@ -1651,6 +1727,11 @@ a {
   }
   .hero-subtitle {
     font-size: 1.05rem;
+  }
+  .mission-card {
+    flex-direction: column;
+    padding: 26px 20px;
+    gap: 14px;
   }
   .segment-grid {
     grid-template-columns: 1fr;

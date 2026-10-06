@@ -27,6 +27,13 @@
 
 ---
 
+> ### 💡 Our Mission: Helping People Truly Understand Each Other
+> In modern workplaces, people constantly struggle to understand what a specific phrase actually meant — wondering if a comment is passive-aggressive, second-guessing an ambiguous message, or trying to bridge technical dialects between **IT, Marketing, Accounting, and the Lab**.
+>
+> **NativeLingo exists to eliminate that anxiety.** We help people decode what was really meant and reply with clarity, empathy, and native confidence — across 53+ languages and every department.
+
+---
+
 ## 👥 Two Audiences. One Privacy-First Engine.
 
 NativeLingo is built to solve everyday communication friction for individual knowledge workers, while providing strict data governance for enterprise security teams:

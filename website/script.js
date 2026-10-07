@@ -88,8 +88,14 @@ function setupSimulator() {
   tabs.forEach(({ el, key }) => {
     if (!el) return;
     el.addEventListener('click', () => {
-      tabs.forEach(t => t.el?.classList.remove('active'));
-      el.classList.add('active');
+      tabs.forEach(t => {
+        if (t.el) {
+          t.el.classList.remove('bg-indigo-600', 'text-white', 'font-semibold');
+          t.el.classList.add('bg-slate-800/80', 'text-slate-300');
+        }
+      });
+      el.classList.remove('bg-slate-800/80', 'text-slate-300');
+      el.classList.add('bg-indigo-600', 'text-white', 'font-semibold');
       switchScenario(key);
     });
   });
@@ -100,10 +106,10 @@ function setupSimulator() {
       navigator.clipboard.writeText(textToCopy).then(() => {
         const originalText = btnSimCopy.innerText;
         btnSimCopy.innerText = 'Copied!';
-        btnSimCopy.style.borderColor = '#10b981';
+        btnSimCopy.classList.add('bg-emerald-600');
         setTimeout(() => {
           btnSimCopy.innerText = originalText;
-          btnSimCopy.style.borderColor = '';
+          btnSimCopy.classList.remove('bg-emerald-600');
         }, 2000);
       });
     });
@@ -115,11 +121,11 @@ function switchScenario(key) {
   if (!data) return;
 
   activeScenario = key;
-  simAppTitle.innerText = data.app;
-  simLatency.innerText = data.latency;
-  simModel.innerText = data.model;
-  simActionBadge.innerText = data.hotkeyText;
-  simInputText.innerText = data.input;
+  if (simAppTitle) simAppTitle.innerText = data.app;
+  if (simLatency) simLatency.innerText = data.latency;
+  if (simModel) simModel.innerText = data.model;
+  if (simActionBadge) simActionBadge.innerText = data.hotkeyText;
+  if (simInputText) simInputText.innerText = data.input;
 
   if (simToneDetected && data.toneDetected) {
     simToneDetected.innerText = data.toneDetected;
@@ -128,12 +134,14 @@ function switchScenario(key) {
     simToneTarget.innerText = data.toneTarget;
   }
 
-  // Typing animation for output
-  simOutputText.style.opacity = '0.3';
-  setTimeout(() => {
-    simOutputText.innerText = data.output;
-    simOutputText.style.opacity = '1';
-  }, 150);
+  // Fade animation for output
+  if (simOutputText) {
+    simOutputText.style.opacity = '0.3';
+    setTimeout(() => {
+      simOutputText.innerText = data.output;
+      simOutputText.style.opacity = '1';
+    }, 150);
+  }
 }
 
 // Order Modal Logic
@@ -151,10 +159,10 @@ function openOrderModal(tierKey) {
   let emailSubject = '';
 
   if (tierKey === 'annual') {
-    title = 'Single-User Annual ($17 / year)';
-    desc = 'Includes 2 workstations, 1 named user, all version updates, and priority corporate support.';
+    title = 'Commercial Pro ($19 / year)';
+    desc = 'Includes 2 workstations, commercial rights, all version updates, and priority support.';
     orderTemplate = `To: licensing@businessintelsystem.com
-Subject: Order Request: NativeLingo Commercial Single-User Annual ($17/yr)
+Subject: Order Request: NativeLingo Commercial Pro ($19/yr)
 
 Company / Organization: [Your Company Name]
 Contact Name: [Your Full Name]
@@ -163,26 +171,12 @@ Workstations Required: 2 PCs (Included)
 Payment Preference: Credit Card / Corporate Invoice / Wire
 
 Please send commercial invoice & license activation token (NL1-...).`;
-    emailSubject = encodeURIComponent('NativeLingo Order: Single-User Annual ($17/yr)');
-  } else if (tierKey === 'perpetual') {
-    title = 'Single-User Perpetual ($29 one-time)';
-    desc = 'Own your version license forever. Includes 12 months of version updates and 2 workstations.';
-    orderTemplate = `To: licensing@businessintelsystem.com
-Subject: Order Request: NativeLingo Single-User Perpetual ($29 Launch Deal)
-
-Company / Organization: [Your Company Name]
-Contact Name: [Your Full Name]
-Contact Email: [Your Email]
-Workstations Required: 2 PCs (Included)
-Payment Preference: Credit Card / Corporate Invoice / Wire
-
-Please send commercial invoice & lifetime offline license token (NL1-...).`;
-    emailSubject = encodeURIComponent('NativeLingo Order: Single-User Perpetual ($29)');
+    emailSubject = encodeURIComponent('NativeLingo Order: Commercial Pro ($19/yr)');
   } else {
-    title = 'Multi-User Team ($24 / seat / year)';
-    desc = 'Centralized Group Policy deployment, minimum 3 seats ($72/yr), corporate VAT receipts & SLA.';
+    title = 'Enterprise BYOM ($39 / seat / year)';
+    desc = 'Centralized Group Policy deployment, minimum 3 seats ($117/yr), corporate VAT receipts & offline key.';
     orderTemplate = `To: licensing@businessintelsystem.com
-Subject: Order Request: NativeLingo Multi-User Team Deployment ($24/seat/yr)
+Subject: Order Request: NativeLingo Enterprise BYOM Deployment ($39/seat/yr)
 
 Company / Organization: [Your Corporate Name]
 Department / Team: [e.g. Consulting, Engineering, Support]
@@ -192,7 +186,7 @@ Billing Address & VAT / Tax ID: [If applicable]
 Payment Preference: Corporate Invoice / ACH / Wire Transfer
 
 Please send formal corporate proforma invoice and central policy deployment guide.`;
-    emailSubject = encodeURIComponent('NativeLingo Corporate Team Licensing Request ($24/seat)');
+    emailSubject = encodeURIComponent('NativeLingo Enterprise BYOM Licensing Request ($39/seat)');
   }
 
   if (modalTierTitle) modalTierTitle.innerText = title;
@@ -210,7 +204,7 @@ Please send formal corporate proforma invoice and central policy deployment guid
     if (tierKey === 'annual') {
       modalStripeContainer.style.display = 'block';
       btnModalStripe.href = 'https://buy.stripe.com/test_14A8wO7o0cuL5sM7rDeUU00';
-      btnModalStripe.innerText = '💳 Pay Instantly with Card / Apple Pay ($17)';
+      btnModalStripe.innerText = '💳 Pay Instantly with Card / Apple Pay ($19)';
     } else {
       modalStripeContainer.style.display = 'none';
     }

@@ -4,52 +4,73 @@
  */
 
 const SCENARIOS = {
-  support: {
-    app: 'Slack — #customer-support-urgent',
-    model: 'Llama-3.3-70B (Groq)',
-    latency: '210ms',
-    hotkeyText: 'Pressing Ctrl + Alt + 1 (Empathetic De-escalation & Polish)',
-    input: '"we cant deliver this on monday because your api keeps returning 500 errors and our devs are blocked please fix ASAP or we cancel subscription"',
-    output: '"Thank you for bringing this to our urgent attention. We have identified intermittent 500 error responses on the endpoint and our engineering team is actively prioritizing a fix. We will update you within the next 2 hours with an ETA to ensure your Monday release timeline remains protected."'
+  reply: {
+    app: 'Slack — #team-project-launch',
+    model: 'Gemini 2.5 Flash',
+    latency: '260ms',
+    hotkeyText: 'Pressing Ctrl + Alt + R (Context-Aware Thread Reply)',
+    input: '"Alex: We need to push the deployment back by 2 days because the staging tests failed on payment webhooks.\nElena: Client wants an update in 30 mins, who is telling them?"',
+    toneDetected: '⚠️ Blocker Panic & Escalation Anxiety',
+    toneTarget: '🎯 Diplomatic Ownership & Clear Client Reassurance',
+    output: '"I will update the client right now. I will explain that our staging quality checks caught an edge case in payment webhook validation, and we are proactively rescheduling deployment by 48 hours to ensure zero transaction failures in production."'
+  },
+  crossdept: {
+    app: 'Slack — #lab-operations ➔ #sales-leads',
+    model: 'Claude 3.5 Sonnet (Direct BYOM)',
+    latency: '310ms',
+    hotkeyText: 'Pressing Ctrl + Alt + 1 (Translate Lab / IT Specs to Executive Action)',
+    input: '"Batch #309 assay titration failed at 91.4% purity threshold due to thermal excursion in reactor 2. Cannot release Certificate of Analysis without 72h re-crystallisation re-run."',
+    toneDetected: '🔬 Dense Technical Specs & Non-Compliance Blocker',
+    toneTarget: '🎯 Decisive Commercial Go/No-Go & Rescheduled Delivery Plan',
+    output: '"Dispatch for Batch #309 is rescheduled by 72 hours for an additional purity run to ensure full compliance with regulatory release standards. The final delivery ETA is Thursday morning at 09:00; customer formulation adjustments are not required."'
   },
   jargon: {
     app: 'Microsoft Teams — Strategy & Operations',
     model: 'Gemini 2.5 Flash',
     latency: '340ms',
-    hotkeyText: 'Pressing Ctrl + Alt + J (Demystify Corporate Slang & Nuance)',
+    hotkeyText: 'Pressing Ctrl + Alt + J (Tone Radar & Corporate Doublespeak Demystifier)',
     input: '"Per my last email, while I appreciate the bandwidth constraints, let\'s circle back and table this initiative for Q3 to ensure we don\'t boil the ocean."',
-    output: '🔍 JARGON & NUANCE BREAKDOWN:\n• "Per my last email": Frustration marker — you missed information already sent.\n• "Bandwidth constraints": Polite acknowledgment that you are overworked.\n• "Table this / don\'t boil the ocean": Project is deprioritized or cancelled for now because it is too complex.'
+    toneDetected: '🧊 Passive-Aggressive Pushback & Hidden Frustration',
+    toneTarget: '💡 Decoded True Corporate Meaning & Nuance',
+    output: '🔍 JARGON & TONE BREAKDOWN:\n• Subtext: Frustration marker — you missed information already sent in a previous message.\n• "Bandwidth constraints": Polite corporate acknowledgment that your team is overloaded.\n• "Table this / don\'t boil the ocean": Deprioritized or soft-rejected because the project scope is too large right now.'
   },
-  code: {
-    app: 'GitHub Pull Request #142 Review',
-    model: 'Claude 3.5 Sonnet (Direct BYOM)',
-    latency: '410ms',
-    hotkeyText: 'Pressing Ctrl + Alt + 2 (Concise Technical Comment)',
-    input: '"hey this code works but you forgot to release the mutex lock on line 88 so if an error throws it will deadlock the whole server process please wrap in try/finally"',
-    output: '"Good catch on the concurrency handling! On line 88, the mutex lock remains acquired if an exception is thrown before release. Could we wrap this block in a `try...finally` to ensure the lock is always safely released and avoid potential server deadlocks?"'
+  finance: {
+    app: 'Outlook — Corporate Accounting & Audit',
+    model: 'Llama-3.3-70B (Groq)',
+    latency: '220ms',
+    hotkeyText: 'Pressing Ctrl + Alt + 2 (De-escalate Audit Demands into Collaborative Next Steps)',
+    input: '"Please provide itemized OPEX allocation variances and CAPEX depreciation schedules before EoD or all pending project procurement approvals will freeze."',
+    toneDetected: '⚠️ Rigid Compliance Ultimatum & Audit Pressure',
+    toneTarget: '🤝 Collaborative Solution & Simplified Line-Item Deliverable',
+    output: '"To keep our project procurement on schedule today, our team has pre-filled the variance report with the two required OPEX categories. We have highlighted the necessary fields so this takes under 5 minutes to confirm and keep our release approvals moving."'
   },
   translate: {
     app: 'Outlook — German Partner Inbound',
     model: '100% Offline Ollama (Local Llama 3.2)',
     latency: '180ms',
     hotkeyText: 'Pressing Ctrl + Alt + T (Instant Streaming Translation)',
-    input: '"Sehr geehrte Damen und Herren, anbei finden Sie die überarbeiteten Verträge für das Audit. Bitte um zeitnahe Gegenzeichnung."',
-    output: '"Dear Sir or Madam, please find attached the revised contracts for the audit. We kindly request prompt countersigning."'
+    input: '"Sehr geehrte Damen und Herren, anbei finden Sie die überarbeiteten Laborprotokolle und Validierungsberichte für das regulatorische Audit. Bitte um zeitnahe Gegenzeichnung."',
+    toneDetected: '📜 Formal Regulatory Inbound (German)',
+    toneTarget: '🌐 Natural Professional Business English',
+    output: '"Dear Sir or Madam, please find attached the revised laboratory protocols and validation reports for the regulatory audit. We kindly request prompt countersigning."'
   }
 };
 
-let activeScenario = 'support';
+let activeScenario = 'reply';
 
 // DOM Elements
-const tabSupport = document.getElementById('tab-support');
+const tabReply = document.getElementById('tab-reply');
+const tabCrossdept = document.getElementById('tab-crossdept');
 const tabJargon = document.getElementById('tab-jargon');
-const tabCode = document.getElementById('tab-code');
+const tabFinance = document.getElementById('tab-finance');
 const tabTranslate = document.getElementById('tab-translate');
 
 const simAppTitle = document.getElementById('sim-app-title');
 const simLatency = document.getElementById('sim-latency');
 const simModel = document.getElementById('sim-model');
 const simInputText = document.getElementById('sim-input-text');
+const simToneDetected = document.getElementById('sim-tone-detected');
+const simToneTarget = document.getElementById('sim-tone-target');
 const simActionBadge = document.getElementById('sim-action-badge');
 const simOutputText = document.getElementById('sim-output-text');
 const btnSimCopy = document.getElementById('btn-sim-copy');
@@ -57,17 +78,24 @@ const btnSimCopy = document.getElementById('btn-sim-copy');
 // Preset Tab Handlers
 function setupSimulator() {
   const tabs = [
-    { el: tabSupport, key: 'support' },
+    { el: tabReply, key: 'reply' },
+    { el: tabCrossdept, key: 'crossdept' },
     { el: tabJargon, key: 'jargon' },
-    { el: tabCode, key: 'code' },
+    { el: tabFinance, key: 'finance' },
     { el: tabTranslate, key: 'translate' }
   ];
 
   tabs.forEach(({ el, key }) => {
     if (!el) return;
     el.addEventListener('click', () => {
-      tabs.forEach(t => t.el?.classList.remove('active'));
-      el.classList.add('active');
+      tabs.forEach(t => {
+        if (t.el) {
+          t.el.classList.remove('bg-indigo-600', 'text-white', 'font-semibold');
+          t.el.classList.add('bg-slate-800/80', 'text-slate-300');
+        }
+      });
+      el.classList.remove('bg-slate-800/80', 'text-slate-300');
+      el.classList.add('bg-indigo-600', 'text-white', 'font-semibold');
       switchScenario(key);
     });
   });
@@ -78,10 +106,10 @@ function setupSimulator() {
       navigator.clipboard.writeText(textToCopy).then(() => {
         const originalText = btnSimCopy.innerText;
         btnSimCopy.innerText = 'Copied!';
-        btnSimCopy.style.borderColor = '#10b981';
+        btnSimCopy.classList.add('bg-emerald-600');
         setTimeout(() => {
           btnSimCopy.innerText = originalText;
-          btnSimCopy.style.borderColor = '';
+          btnSimCopy.classList.remove('bg-emerald-600');
         }, 2000);
       });
     });
@@ -93,18 +121,27 @@ function switchScenario(key) {
   if (!data) return;
 
   activeScenario = key;
-  simAppTitle.innerText = data.app;
-  simLatency.innerText = data.latency;
-  simModel.innerText = data.model;
-  simActionBadge.innerText = data.hotkeyText;
-  simInputText.innerText = data.input;
+  if (simAppTitle) simAppTitle.innerText = data.app;
+  if (simLatency) simLatency.innerText = data.latency;
+  if (simModel) simModel.innerText = data.model;
+  if (simActionBadge) simActionBadge.innerText = data.hotkeyText;
+  if (simInputText) simInputText.innerText = data.input;
 
-  // Typing animation for output
-  simOutputText.style.opacity = '0.3';
-  setTimeout(() => {
-    simOutputText.innerText = data.output;
-    simOutputText.style.opacity = '1';
-  }, 150);
+  if (simToneDetected && data.toneDetected) {
+    simToneDetected.innerText = data.toneDetected;
+  }
+  if (simToneTarget && data.toneTarget) {
+    simToneTarget.innerText = data.toneTarget;
+  }
+
+  // Fade animation for output
+  if (simOutputText) {
+    simOutputText.style.opacity = '0.3';
+    setTimeout(() => {
+      simOutputText.innerText = data.output;
+      simOutputText.style.opacity = '1';
+    }, 150);
+  }
 }
 
 // Order Modal Logic
@@ -122,10 +159,10 @@ function openOrderModal(tierKey) {
   let emailSubject = '';
 
   if (tierKey === 'annual') {
-    title = 'Single-User Annual ($17 / year)';
-    desc = 'Includes 2 workstations, 1 named user, all version updates, and priority corporate support.';
+    title = 'Commercial Pro ($19 / year)';
+    desc = 'Includes 2 workstations, commercial rights, all version updates, and priority support.';
     orderTemplate = `To: licensing@businessintelsystem.com
-Subject: Order Request: NativeLingo Commercial Single-User Annual ($17/yr)
+Subject: Order Request: NativeLingo Commercial Pro ($19/yr)
 
 Company / Organization: [Your Company Name]
 Contact Name: [Your Full Name]
@@ -134,26 +171,12 @@ Workstations Required: 2 PCs (Included)
 Payment Preference: Credit Card / Corporate Invoice / Wire
 
 Please send commercial invoice & license activation token (NL1-...).`;
-    emailSubject = encodeURIComponent('NativeLingo Order: Single-User Annual ($17/yr)');
-  } else if (tierKey === 'perpetual') {
-    title = 'Single-User Perpetual ($29 one-time)';
-    desc = 'Own your version license forever. Includes 12 months of version updates and 2 workstations.';
-    orderTemplate = `To: licensing@businessintelsystem.com
-Subject: Order Request: NativeLingo Single-User Perpetual ($29 Launch Deal)
-
-Company / Organization: [Your Company Name]
-Contact Name: [Your Full Name]
-Contact Email: [Your Email]
-Workstations Required: 2 PCs (Included)
-Payment Preference: Credit Card / Corporate Invoice / Wire
-
-Please send commercial invoice & lifetime offline license token (NL1-...).`;
-    emailSubject = encodeURIComponent('NativeLingo Order: Single-User Perpetual ($29)');
+    emailSubject = encodeURIComponent('NativeLingo Order: Commercial Pro ($19/yr)');
   } else {
-    title = 'Multi-User Team ($24 / seat / year)';
-    desc = 'Centralized Group Policy deployment, minimum 3 seats ($72/yr), corporate VAT receipts & SLA.';
+    title = 'Enterprise BYOM ($39 / seat / year)';
+    desc = 'Centralized Group Policy deployment, minimum 3 seats ($117/yr), corporate VAT receipts & offline key.';
     orderTemplate = `To: licensing@businessintelsystem.com
-Subject: Order Request: NativeLingo Multi-User Team Deployment ($24/seat/yr)
+Subject: Order Request: NativeLingo Enterprise BYOM Deployment ($39/seat/yr)
 
 Company / Organization: [Your Corporate Name]
 Department / Team: [e.g. Consulting, Engineering, Support]
@@ -163,7 +186,7 @@ Billing Address & VAT / Tax ID: [If applicable]
 Payment Preference: Corporate Invoice / ACH / Wire Transfer
 
 Please send formal corporate proforma invoice and central policy deployment guide.`;
-    emailSubject = encodeURIComponent('NativeLingo Corporate Team Licensing Request ($24/seat)');
+    emailSubject = encodeURIComponent('NativeLingo Enterprise BYOM Licensing Request ($39/seat)');
   }
 
   if (modalTierTitle) modalTierTitle.innerText = title;
@@ -181,7 +204,7 @@ Please send formal corporate proforma invoice and central policy deployment guid
     if (tierKey === 'annual') {
       modalStripeContainer.style.display = 'block';
       btnModalStripe.href = 'https://buy.stripe.com/test_14A8wO7o0cuL5sM7rDeUU00';
-      btnModalStripe.innerText = '💳 Pay Instantly with Card / Apple Pay ($17)';
+      btnModalStripe.innerText = '💳 Pay Instantly with Card / Apple Pay ($19)';
     } else {
       modalStripeContainer.style.display = 'none';
     }

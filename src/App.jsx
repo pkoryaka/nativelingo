@@ -7,6 +7,7 @@ import { JargonExplainerCard } from './components/JargonExplainerCard';
 import { SettingsModal } from './components/SettingsModal';
 import { HistoryDrawer } from './components/HistoryDrawer';
 import { MiniTranslatePopup } from './components/MiniTranslatePopup';
+import { ReplyModal } from './components/ReplyModal';
 import { translateText } from './services/geminiService';
 import { storageService } from './services/storageService';
 import { licenseService } from './services/licenseService';
@@ -44,6 +45,8 @@ export function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('models');
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
+  const [replyModalContextText, setReplyModalContextText] = useState('');
 
   const handleOpenSettings = (tab = 'models') => {
     setSettingsTab(typeof tab === 'string' ? tab : 'models');
@@ -250,6 +253,15 @@ export function App() {
     if (window.electronAPI?.onQuickTranslate) {
       const unsubscribe = window.electronAPI.onQuickTranslate((payload) => {
         const text = typeof payload === 'string' ? payload : payload?.text;
+        const isReply = typeof payload === 'object' ? Boolean(payload?.isReplyMode || payload?.slotId === 4) : false;
+
+        if (isReply) {
+          switchToFullMode();
+          setReplyModalContextText(text || '');
+          setIsReplyModalOpen(true);
+          return;
+        }
+
         const shouldExplain = typeof payload === 'object' ? Boolean(payload.explainJargon) : false;
         const slotPrompt = typeof payload === 'object' ? payload?.customPrompt : '';
         const slotName = typeof payload === 'object' ? payload?.slotName : '';
@@ -309,7 +321,18 @@ export function App() {
       });
       return () => unsubscribe && unsubscribe();
     }
-  }, []);
+  }, [switchToFullMode]);
+
+  useEffect(() => {
+    if (window.electronAPI?.onOpenReplyModal) {
+      const unsubscribe = window.electronAPI.onOpenReplyModal((data) => {
+        switchToFullMode();
+        setReplyModalContextText(data?.text || '');
+        setIsReplyModalOpen(true);
+      });
+      return () => unsubscribe && unsubscribe();
+    }
+  }, [switchToFullMode]);
 
   useEffect(() => {
     if (window.electronAPI?.onWindowHidden) {
@@ -388,6 +411,11 @@ export function App() {
           switchToFullMode();
           setIsSettingsOpen(true);
         }}
+        onOpenReplyModal={(context) => {
+          switchToFullMode();
+          setReplyModalContextText(context || sourceText || translatedText || '');
+          setIsReplyModalOpen(true);
+        }}
         onClose={handleCloseMini}
       />
     );
@@ -430,6 +458,10 @@ export function App() {
         onToggleTheme={handleToggleTheme}
         onOpenSettings={handleOpenSettings}
         onOpenHistory={() => setIsHistoryOpen(true)}
+        onOpenReplyModal={() => {
+          setReplyModalContextText(sourceText || '');
+          setIsReplyModalOpen(true);
+        }}
       />
 
       {/* Language & Explainer Switch Bar */}
@@ -502,6 +534,13 @@ export function App() {
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
         onSelectHistoryItem={handleSelectHistoryItem}
+      />
+
+      {/* AI Reply Assistant Modal */}
+      <ReplyModal
+        isOpen={isReplyModalOpen}
+        onClose={() => setIsReplyModalOpen(false)}
+        initialContextText={replyModalContextText}
       />
     </div>
   );

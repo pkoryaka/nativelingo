@@ -12,7 +12,8 @@ import {
   Settings,
   ShieldCheck,
   Cloud,
-  CornerDownLeft
+  CornerDownLeft,
+  MessageSquareReply
 } from 'lucide-react';
 import { SUPPORTED_LANGUAGES } from '../services/geminiService';
 import { storageService } from '../services/storageService';
@@ -27,6 +28,7 @@ export function MiniTranslatePopup({
   isLoading,
   errorMessage,
   onOpenSettings,
+  onOpenReplyModal,
   onCopy
 }) {
   const [copied, setCopied] = useState(false);
@@ -199,6 +201,31 @@ export function MiniTranslatePopup({
         <div className="mini-header-actions">
           {translatedText && (
             <>
+              <button
+                type="button"
+                className="btn-reply-mode"
+                onClick={() => onOpenReplyModal && onOpenReplyModal(sourceText || translatedText)}
+                title="Open Smart Reply Assistant to draft response (Ctrl+Alt+R)"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  background: 'rgba(99, 102, 241, 0.15)',
+                  color: 'var(--primary)',
+                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  borderRadius: '6px',
+                  padding: '3px 8px',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  marginRight: '2px'
+                }}
+              >
+                <MessageSquareReply size={12} />
+                <span>Reply</span>
+              </button>
+
               <button
                 type="button"
                 className="btn-insert-reply"

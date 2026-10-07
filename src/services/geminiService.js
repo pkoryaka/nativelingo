@@ -736,3 +736,138 @@ Respond ONLY in JSON format:
     throw err;
   }
 }
+
+/**
+ * Automatically determine the language, tone, and brief summary of an incoming message.
+ */
+export async function detectIncomingMessageInfo(text) {
+  if (!text || !text.trim()) {
+    return {
+      language: 'Auto-Detect',
+      languageCode: 'auto',
+      tone: 'Neutral',
+      summary: ''
+    };
+  }
+
+  const prompt = `Analyze this incoming message. Identify:
+1. The language it is written in (both full English name e.g. "German", "Spanish", "English", and ISO code e.g. "de", "es", "en").
+2. The sender's tone (e.g. "Polite & Professional", "Urgent / Demanding", "Casual & Friendly", "Formal Business", "Inquiring / Curious", "Critical / Dissatisfied").
+3. A brief 1-sentence summary of what the sender is communicating or asking.
+
+Message to analyze:
+"""${text.trim()}"""
+
+Respond ONLY in valid JSON format:
+{
+  "language": "string",
+  "languageCode": "string",
+  "tone": "string",
+  "summary": "string"
+}`;
+
+  try {
+    const res = await translateText('auto', 'en', text.trim(), {
+      customPrompt: prompt
+    });
+
+    const raw = typeof res === 'object' && res.translation ? res.translation : String(res || '');
+    const cleanJson = raw.replace(/```json\n?|\n?```/g, '').trim();
+    const parsed = JSON.parse(cleanJson);
+
+    const matchedLang = SUPPORTED_LANGUAGES.find(
+      (l) => l.code.toLowerCase() === (parsed.languageCode || '').toLowerCase() ||
+             l.name.toLowerCase() === (parsed.language || '').toLowerCase()
+    );
+
+    return {
+      language: matchedLang ? matchedLang.name : (parsed.language || 'English'),
+      languageCode: matchedLang ? matchedLang.code : (parsed.languageCode || 'en'),
+      tone: parsed.tone || 'Professional',
+      summary: parsed.summary || ''
+    };
+  } catch (err) {
+    console.warn('Language/tone detection heuristic fallback:', err);
+    const sample = text.trim();
+    const isCyrillic = /[\u0400-\u04FF]/.test(sample);
+    const isGerman = /[äöüßÄÖÜ]/.test(sample);
+    const isSpanish = /[áéíóúñ¿¡ÁÉÍÓÚÑ]/.test(sample);
+    const isFrench = /[éèêëàâçîïôûù]/.test(sample);
+    const isJapanese = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(sample);
+
+    let detectedLang = 'English';
+    let detectedCode = 'en';
+    if (isJapanese) { detectedLang = 'Japanese'; detectedCode = 'ja'; }
+    else if (isCyrillic) { detectedLang = 'Ukrainian'; detectedCode = 'uk'; }
+    else if (isGerman) { detectedLang = 'German'; detectedCode = 'de'; }
+    else if (isSpanish) { detectedLang = 'Spanish'; detectedCode = 'es'; }
+    else if (isFrench) { detectedLang = 'French'; detectedCode = 'fr'; }
+
+    return {
+      language: detectedLang,
+      languageCode: detectedCode,
+      tone: 'Standard',
+      summary: ''
+    };
+  }
+}
+
+/**
+ * Draft context-aware replies based on incoming message and user's intent.
+ */
+export async function draftSmartReply({
+  incomingText,
+  userIntent,
+  tone = 'Professional Business',
+  targetLang = 'auto',
+  detectedLang = 'English',
+  onStreamChunk
+}) {
+  if (!incomingText || !incomingText.trim()) {
+    throw new Error('Please provide an incoming message or highlight text to reply to.');
+  }
+  if (!userIntent || !userIntent.trim()) {
+    throw new Error('Please specify what you would like to reply (e.g. "tell him that I don\'t want it anymore").');
+  }
+
+  const targetLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === targetLang);
+  const resolvedTargetLanguage = (targetLang === 'auto' || !targetLang)
+    ? `the exact same language as the incoming message (detected as ${detectedLang})`
+    : (targetLangObj ? `${targetLangObj.name} (${targetLangObj.nativeName})` : targetLang);
+
+  const prompt = `You are an elite multilingual executive communications assistant.
+Your task is to draft a high-quality reply to the incoming message below, strictly according to the user's intent.
+
+[INCOMING MESSAGE FROM SENDER]
+"""
+${incomingText.trim()}
+"""
+
+[USER'S REPLY INTENT / INSTRUCTION]
+"""
+${userIntent.trim()}
+"""
+
+[DESIRED REPLY TONE]
+${tone}
+
+[TARGET LANGUAGE FOR THE REPLY]
+${resolvedTargetLanguage}
+
+CRITICAL RULES:
+1. Write the reply in the requested TARGET LANGUAGE: ${resolvedTargetLanguage}.
+2. Faithfully deliver the user's intent (for example: if they want to decline or say they don't want it anymore, draft a clear, diplomatic, and definitive response matching the requested tone).
+3. Directly address the specific points, questions, or context from the incoming message so the reply feels completely natural and contextual.
+4. Output ONLY the drafted reply text ready to copy and send.
+5. Do NOT include quotation marks around the message.
+6. Do NOT include any commentary, analysis, greetings like "[Your Name]", or introductory remarks like "Here is your reply:".`;
+
+  const res = await translateText('auto', targetLang === 'auto' ? 'auto' : targetLang, incomingText, {
+    customPrompt: prompt,
+    onStreamChunk
+  });
+
+  const replyText = typeof res === 'object' && res.translation ? res.translation : String(res || '');
+  return replyText.trim();
+}
+

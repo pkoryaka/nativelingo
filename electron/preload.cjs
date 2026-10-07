@@ -39,6 +39,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('open-settings', subscription);
     return () => ipcRenderer.removeListener('open-settings', subscription);
   },
+  onOpenReplyModal: (callback) => {
+    const subscription = (event, data) => callback(data);
+    ipcRenderer.on('open-reply-modal', subscription);
+    return () => ipcRenderer.removeListener('open-reply-modal', subscription);
+  },
   onShowFullWindow: (callback) => {
     const subscription = () => callback();
     ipcRenderer.on('show-full-window', subscription);

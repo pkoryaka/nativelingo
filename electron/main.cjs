@@ -1262,6 +1262,37 @@ function triggerQuickSlotAction(slotId) {
         const isConsecutiveUndoVariant = !trimmed && isRecent && isSameSlot && Boolean(lastQuickRewrite.lastVariant) && (now - lastQuickRewrite.timestamp < 15000);
 
         if (!trimmed && !isConsecutiveUndoVariant) {
+          const isReply = slot.id === 4 || (slot.name && slot.name.toLowerCase().includes('reply'));
+          if (isReply) {
+            // User pressed Reply Mode hotkey without a selection: open modal with previous clipboard text if available
+            if (previousClipboard) {
+              clipboard.writeText(previousClipboard);
+            }
+            if (mainWindow) {
+              if (isMiniWindowMode) {
+                mainWindow.setAlwaysOnTop(false);
+                mainWindow.setMinimumSize(800, 600);
+                if (!mainWindow.isMaximized()) {
+                  mainWindow.setSize(1000, 720);
+                  mainWindow.center();
+                }
+                isMiniWindowMode = false;
+              }
+              mainWindow.webContents.send('quick-translate', {
+                text: previousClipboard || '',
+                customPrompt: slot.prompt,
+                slotName: slot.name,
+                slotId: slot.id,
+                isReplyMode: true
+              });
+              mainWindow.webContents.send('open-reply-modal', {
+                text: previousClipboard || ''
+              });
+              focusAppWindow(false);
+            }
+            return;
+          }
+
           // Truly no text selected: restore user's previous clipboard and exit silently
           if (previousClipboard) {
             clipboard.writeText(previousClipboard);
@@ -1355,14 +1386,40 @@ Output ONLY the transformed text directly without conversational preamble, intro
             isProcessingSlot = false;
           }
         } else {
-          // Open Floating HUD with explicit custom prompt
+          // Open Floating HUD or dedicated Reply Mode
+          const isReply = slot.id === 4 || (slot.name && slot.name.toLowerCase().includes('reply'));
           if (mainWindow) {
-            mainWindow.webContents.send('quick-translate', {
-              text: textToTransform,
-              customPrompt: slot.prompt,
-              slotName: slot.name
-            });
-            focusAppWindow(true);
+            if (isReply) {
+              if (isMiniWindowMode) {
+                mainWindow.setAlwaysOnTop(false);
+                mainWindow.setMinimumSize(800, 600);
+                if (!mainWindow.isMaximized()) {
+                  mainWindow.setSize(1000, 720);
+                  mainWindow.center();
+                }
+                isMiniWindowMode = false;
+              }
+              mainWindow.webContents.send('quick-translate', {
+                text: textToTransform,
+                customPrompt: slot.prompt,
+                slotName: slot.name,
+                slotId: slot.id,
+                isReplyMode: true
+              });
+              mainWindow.webContents.send('open-reply-modal', {
+                text: textToTransform
+              });
+              focusAppWindow(false);
+            } else {
+              mainWindow.webContents.send('quick-translate', {
+                text: textToTransform,
+                customPrompt: slot.prompt,
+                slotName: slot.name,
+                slotId: slot.id,
+                isReplyMode: false
+              });
+              focusAppWindow(true);
+            }
           }
         }
       }, 40);

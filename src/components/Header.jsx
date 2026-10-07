@@ -1,13 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Languages, Settings, History, Sparkles, Sun, Moon, ShieldCheck, 
-  Cloud, BadgeCheck, Clock, Building2, Bot, Zap, Cpu, Globe, Server 
+  Cloud, BadgeCheck, Clock, Building2, Bot, Zap, Cpu, Globe, Server,
+  MessageSquareReply
 } from 'lucide-react';
 import { storageService, AI_PROVIDERS } from '../services/storageService';
 import { licenseService } from '../services/licenseService';
 import appLogo from '../assets/app-icon.png';
 
-export function Header({ currentModel, onOpenSettings, onOpenHistory, hasApiKey, theme, onToggleTheme, license: propLicense }) {
+export function Header({ 
+  currentModel, 
+  onOpenSettings, 
+  onOpenHistory, 
+  onOpenReplyModal, 
+  hasApiKey, 
+  theme, 
+  onToggleTheme, 
+  license: propLicense 
+}) {
   const settings = storageService.getSettings();
   const currentProviderId = settings.aiProvider || 'gemini';
   const providerMeta = AI_PROVIDERS.find((p) => p.id === currentProviderId) || AI_PROVIDERS[0];
@@ -162,6 +172,21 @@ export function Header({ currentModel, onOpenSettings, onOpenHistory, hasApiKey,
           <span className={`badge-pulse-dot ${hasApiKey ? '' : 'warning'}`} />
           <Sparkles size={13} />
           <span>{currentModel}</span>
+        </button>
+
+        <button 
+          className="btn-icon" 
+          onClick={onOpenReplyModal}
+          title="AI Reply Assistant (Ctrl+Alt+R) - Draft smart replies in any language"
+          aria-label="Smart Reply Assistant"
+          style={{
+            position: 'relative',
+            background: 'rgba(99, 102, 241, 0.12)',
+            border: '1px solid rgba(99, 102, 241, 0.25)',
+            color: 'var(--primary)'
+          }}
+        >
+          <MessageSquareReply size={18} />
         </button>
 
         <button 

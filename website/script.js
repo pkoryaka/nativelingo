@@ -1,7 +1,24 @@
 /**
- * NativeLingo Website Interactive Simulator & Order Modal
+ * NativeLingo Website Interactive Simulator, Analytics & Order Modal
  * Target: businessintelsystem.com
  */
+
+// Live Checkout URLs (Lemon Squeezy / Paddle / Live Stripe Payment Links)
+// Leave empty ('') until live checkout links are created to show instant invoice fallback.
+const CHECKOUT_URLS = {
+  annual: '',   // e.g. 'https://nativelingo.lemonsqueezy.com/buy/pro-annual'
+  lifetime: '', // e.g. 'https://nativelingo.lemonsqueezy.com/buy/pro-lifetime'
+  team: ''      // e.g. 'https://nativelingo.lemonsqueezy.com/buy/enterprise-team'
+};
+
+/**
+ * Safely sends custom conversion/engagement events to GA4 if configured.
+ */
+function trackEvent(eventName, eventParams = {}) {
+  if (typeof window.gtag === 'function') {
+    window.gtag('event', eventName, eventParams);
+  }
+}
 
 const SCENARIOS = {
   reply: {
@@ -97,6 +114,7 @@ function setupSimulator() {
       el.classList.remove('bg-slate-800/80', 'text-slate-300');
       el.classList.add('bg-indigo-600', 'text-white', 'font-semibold');
       switchScenario(key);
+      trackEvent('simulator_tab_click', { scenario: key });
     });
   });
 
@@ -104,6 +122,7 @@ function setupSimulator() {
     btnSimCopy.addEventListener('click', () => {
       const textToCopy = simOutputText.innerText;
       navigator.clipboard.writeText(textToCopy).then(() => {
+        trackEvent('simulator_copy_click', { scenario: activeScenario });
         const originalText = btnSimCopy.innerText;
         btnSimCopy.innerText = 'Copied!';
         btnSimCopy.classList.add('bg-emerald-600');
@@ -157,12 +176,14 @@ function openOrderModal(tierKey) {
   let desc = '';
   let orderTemplate = '';
   let emailSubject = '';
+  let checkoutLabel = '';
 
   if (tierKey === 'annual') {
-    title = 'Commercial Pro ($19 / year)';
-    desc = 'Includes 2 workstations, commercial rights, all version updates, and priority support.';
+    title = 'Commercial Pro ($49 / year)';
+    desc = 'Includes 2 workstations, full commercial rights, instant NL1 key, and priority support.';
+    checkoutLabel = '💳 Pay Instantly with Card / Apple Pay ($49/yr)';
     orderTemplate = `To: licensing@businessintelsystem.com
-Subject: Order Request: NativeLingo Commercial Pro ($19/yr)
+Subject: Order Request: NativeLingo Commercial Pro ($49/yr)
 
 Company / Organization: [Your Company Name]
 Contact Name: [Your Full Name]
@@ -171,23 +192,40 @@ Workstations Required: 2 PCs (Included)
 Payment Preference: Credit Card / Corporate Invoice / Wire
 
 Please send commercial invoice & license activation token (NL1-...).`;
-    emailSubject = encodeURIComponent('NativeLingo Order: Commercial Pro ($19/yr)');
-  } else {
-    title = 'Enterprise BYOM ($39 / seat / year)';
-    desc = 'Centralized Group Policy deployment, minimum 3 seats ($117/yr), corporate VAT receipts & offline key.';
+    emailSubject = encodeURIComponent('NativeLingo Order: Commercial Pro ($49/yr)');
+  } else if (tierKey === 'lifetime') {
+    title = 'Commercial Pro — Launch Lifetime ($39 one-time)';
+    desc = 'Early-bird perpetual commercial license for 1 user (2 PCs) + 12 months of updates.';
+    checkoutLabel = '💳 Pay Instantly with Card / Apple Pay ($39)';
     orderTemplate = `To: licensing@businessintelsystem.com
-Subject: Order Request: NativeLingo Enterprise BYOM Deployment ($39/seat/yr)
+Subject: Order Request: NativeLingo Launch Lifetime License ($39)
+
+Company / Organization: [Your Company or Freelance Name]
+Contact Name: [Your Full Name]
+Contact Email: [Your Email]
+Promo Tier: EARLYBIRD Lifetime ($39 one-time)
+
+Please send payment link & offline NL1 license key.`;
+    emailSubject = encodeURIComponent('NativeLingo Order: Launch Lifetime ($39)');
+  } else {
+    title = 'Enterprise BYOM ($79 / seat / year)';
+    desc = 'Centralized GPO/Intune policy.json, DLP mode, minimum 3 seats ($237/yr), VAT invoice & offline key.';
+    checkoutLabel = '💳 Pay Instantly for Team Seats ($79/seat/yr)';
+    orderTemplate = `To: licensing@businessintelsystem.com
+Subject: Order Request: NativeLingo Enterprise BYOM ($79/seat/yr)
 
 Company / Organization: [Your Corporate Name]
-Department / Team: [e.g. Consulting, Engineering, Support]
+Department / Team: [e.g. Consulting, Engineering, Support, Lab]
 Number of Seats Required: [Min 3 seats]
 Billing Contact Email: [Procurement or AP Email]
 Billing Address & VAT / Tax ID: [If applicable]
-Payment Preference: Corporate Invoice / ACH / Wire Transfer
+Payment Preference: Credit Card / Corporate Invoice / ACH / Wire Transfer
 
-Please send formal corporate proforma invoice and central policy deployment guide.`;
-    emailSubject = encodeURIComponent('NativeLingo Enterprise BYOM Licensing Request ($39/seat)');
+Please send formal corporate proforma invoice and central policy.json deployment guide.`;
+    emailSubject = encodeURIComponent('NativeLingo Enterprise BYOM Licensing Request ($79/seat)');
   }
+
+  trackEvent('order_modal_open', { tier: tierKey });
 
   if (modalTierTitle) modalTierTitle.innerText = title;
   if (modalTierDesc) modalTierDesc.innerText = desc;
@@ -200,11 +238,13 @@ Please send formal corporate proforma invoice and central policy deployment guid
 
   const modalStripeContainer = document.getElementById('modal-stripe-container');
   const btnModalStripe = document.getElementById('btn-modal-stripe');
+  const liveCheckoutUrl = CHECKOUT_URLS[tierKey] || '';
   if (modalStripeContainer && btnModalStripe) {
-    if (tierKey === 'annual') {
+    if (liveCheckoutUrl) {
       modalStripeContainer.style.display = 'block';
-      btnModalStripe.href = 'https://buy.stripe.com/test_14A8wO7o0cuL5sM7rDeUU00';
-      btnModalStripe.innerText = '💳 Pay Instantly with Card / Apple Pay ($19)';
+      btnModalStripe.href = liveCheckoutUrl;
+      btnModalStripe.innerText = checkoutLabel;
+      btnModalStripe.onclick = () => trackEvent('begin_checkout', { tier: tierKey });
     } else {
       modalStripeContainer.style.display = 'none';
     }
@@ -251,4 +291,9 @@ window.addEventListener('keydown', (e) => {
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   setupSimulator();
+  document.querySelectorAll('a[href*="releases/latest/download"]').forEach((link) => {
+    link.addEventListener('click', () => {
+      trackEvent('download_click', { label: link.innerText.trim() });
+    });
+  });
 });

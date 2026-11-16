@@ -40,28 +40,27 @@ NativeLingo follows a **Fair-Code / Dual-Use Commercial Model** governed by the 
 For businesses and organizations deploying NativeLingo after the 40-day evaluation period:
 
 ### A. Single-User Commercial Pro (Annual)
-- **Price**: **$17 / year** (~$1.42 / month, billed annually)
+- **Price**: **$49 / year** (~$4.08 / month, billed annually)
 - **Included**:
   - Full commercial license for 1 named user across up to 2 workstations.
   - All minor and major software updates released during the subscription.
   - Priority corporate support.
   - 14-day no-questions-asked money-back guarantee.
 
-### B. Single-User Commercial Perpetual (Lifetime License)
-- **Price**: **$37 one-time**
-- **Launch Special**: **$29** (first 200 copies with promo code `EARLYBIRD`)
+### B. Single-User Commercial Perpetual (Launch Lifetime Deal)
+- **Price**: **$39 one-time** (Early-Bird Launch Special — first 200 copies)
 - **Included**:
-  - Perpetual right to use the purchased version forever for commercial operations.
+  - Perpetual right to use the purchased version forever for commercial operations (up to 2 workstations).
   - 12 full months of major and minor updates included.
-  - Optional subsequent year maintenance renewal at **$12 / year** for continued updates.
+  - Optional subsequent year maintenance renewal at **$15 / year** for continued updates.
 
-### C. Multi-User Team & Corporate License
-- **Price**: **$24 / seat / year** (~$2.00 / user / month, minimum 3 seats)
+### C. Multi-User Team & Enterprise BYOM License
+- **Price**: **$79 / seat / year** (minimum 3 seats)
 - **Included**:
-  - Centralized license key management and seat reassignment dashboard.
-  - Cryptographic offline signed Ed25519 license keys.
-  - Corporate VAT / GST compliant invoices and wire / ACH payment options.
-  - Shared team prompt templates and glossary configurations.
+  - Centralized Windows GPO / Intune deployment via `policy.json` (`lockSettings`, `disableHistory` DLP mode).
+  - Cryptographic offline signed Ed25519 license keys (`NL1-...`).
+  - Corporate VAT / GST compliant invoices and card / wire / ACH payment options.
+  - Shared team prompt templates and department glossary configurations.
   - Dedicated support SLA.
 
 ---

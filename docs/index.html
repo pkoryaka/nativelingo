@@ -22,6 +22,21 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
+  <!-- Google Analytics 4 (GA4) — Replace G-XXXXXXXXXX with your live Measurement ID -->
+  <script>
+    window.NL_GA4_ID = 'G-XXXXXXXXXX';
+    if (window.NL_GA4_ID && !window.NL_GA4_ID.includes('XXXX')) {
+      const s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=' + window.NL_GA4_ID;
+      document.head.appendChild(s);
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = function(){ dataLayer.push(arguments); };
+      window.gtag('js', new Date());
+      window.gtag('config', window.NL_GA4_ID, { send_page_view: true });
+    }
+  </script>
+
   <!-- Tailwind CSS via Official CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -685,18 +700,23 @@ Elena: Client wants an update in 30 mins, who is telling them?"
             </div>
             <h3 class="text-xl font-bold font-heading text-slate-900">Commercial Pro</h3>
             <p class="text-xs text-slate-500 mt-1 mb-4">Full commercial rights for individual professionals</p>
-            <div class="text-3xl font-extrabold text-slate-900 mb-1">$19 <span class="text-xs text-slate-500 font-normal">/ year</span></div>
-            <div class="text-xs text-emerald-600 font-semibold mb-4">Just $1.58 / month • 2 PCs included</div>
+            <div class="text-3xl font-extrabold text-slate-900 mb-1">$49 <span class="text-xs text-slate-500 font-normal">/ year</span></div>
+            <div class="text-xs text-emerald-600 font-semibold mb-4">$4.08 / month • 2 PCs included • Instant NL1 key</div>
             <ul class="space-y-2.5 text-xs text-slate-600 mb-6">
               <li class="flex items-center gap-2">✓ Full commercial usage rights</li>
-              <li class="flex items-center gap-2">✓ Offline cryptographic license token</li>
-              <li class="flex items-center gap-2">✓ All future version updates</li>
-              <li class="flex items-center gap-2">✓ Priority commercial email support</li>
+              <li class="flex items-center gap-2">✓ Instant Ed25519 offline license key</li>
+              <li class="flex items-center gap-2">✓ Smart Reply, Tone Cycling & Jargon Radar</li>
+              <li class="flex items-center gap-2">✓ All updates + priority email support</li>
             </ul>
           </div>
-          <button onclick="openOrderModal('annual')" class="w-full py-2.5 text-center text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-colors">
-            Get Commercial License ($19)
-          </button>
+          <div class="space-y-2">
+            <button onclick="openOrderModal('annual')" class="w-full py-2.5 text-center text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-colors">
+              Get Commercial Pro ($49/yr)
+            </button>
+            <button onclick="openOrderModal('lifetime')" class="w-full py-2 text-center text-[11px] font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors">
+              Or Grab Launch Lifetime Deal ($39)
+            </button>
+          </div>
         </div>
 
         <!-- Tier 4: Enterprise BYOM -->
@@ -707,17 +727,17 @@ Elena: Client wants an update in 30 mins, who is telling them?"
             </div>
             <h3 class="text-xl font-bold font-heading text-slate-900">Enterprise BYOM</h3>
             <p class="text-xs text-slate-500 mt-1 mb-4">Group Policy locking & corporate gateways</p>
-            <div class="text-3xl font-extrabold text-slate-900 mb-1">$39 <span class="text-xs text-slate-500 font-normal">/ seat / yr</span></div>
-            <div class="text-xs text-slate-500 mb-4">Min. 3 seats • GPO Policy.json included</div>
+            <div class="text-3xl font-extrabold text-slate-900 mb-1">$79 <span class="text-xs text-slate-500 font-normal">/ seat / yr</span></div>
+            <div class="text-xs text-slate-500 mb-4">Min. 3 seats • GPO policy.json included</div>
             <ul class="space-y-2.5 text-xs text-slate-600 mb-6">
-              <li class="flex items-center gap-2">✓ Centralized Windows GPO deployment</li>
-              <li class="flex items-center gap-2">✓ Enforce 100% offline local air-gap</li>
-              <li class="flex items-center gap-2">✓ Corporate One API / vLLM gateway</li>
+              <li class="flex items-center gap-2">✓ Centralized Windows GPO / Intune rollout</li>
+              <li class="flex items-center gap-2">✓ Enforce 100% offline air-gap + DLP mode</li>
+              <li class="flex items-center gap-2">✓ Corporate One API / vLLM / Azure gateway</li>
               <li class="flex items-center gap-2">✓ Corporate invoicing & VAT receipt</li>
             </ul>
           </div>
           <button onclick="openOrderModal('team')" class="w-full py-2.5 text-center text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
-            Request Enterprise Quote
+            Order Team / Request Quote
           </button>
         </div>
 
